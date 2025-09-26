@@ -5,3 +5,12 @@ black_hole_unc_results/
 cameraman_unc_results/
 *.msgpack
 2dct_br/ct_unc_results/
+fourier_ensembling/bh_logs/
+fourier_ensembling/bh_models/
+fourier_ensembling/bh_noise_logs/
+fourier_ensembling/bh_varnoise_logs/
+fourier_ensembling/bh_varnoise_models/
+fourier_ensembling/camera_logs/
+fourier_ensembling/camera_models/
+fourier_ensembling/starfish_logs/
+fourier_ensembling/starfish_models/
