@@ -1,0 +1,22 @@
+iteration:   0%|          | 0/20000 [00:00<?, ?it/s]
+iteration 0, loss=2.00436
+iteration 1000, loss=0.09067
+iteration 2000, loss=0.06299
+iteration 3000, loss=0.05661
+iteration 4000, loss=0.04874
+iteration 5000, loss=0.04547
+iteration 6000, loss=0.03487
+iteration 7000, loss=0.03660
+iteration 8000, loss=0.03168
+iteration 9000, loss=0.02920
+iteration 10000, loss=0.02805
+iteration 11000, loss=0.02180
+iteration 12000, loss=0.02213
+iteration 13000, loss=0.02091
+iteration 14000, loss=0.01682
+iteration 15000, loss=0.01778
+iteration 16000, loss=0.01661
+iteration 17000, loss=0.01726
+iteration 18000, loss=0.01627
+iteration 19000, loss=0.01353
+[seed=59] saved params to camera_ensemble/models/params_59.msgpack

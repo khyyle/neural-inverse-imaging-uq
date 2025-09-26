@@ -1,0 +1,25 @@
+Welcome to eht-imaging! v 1.2.10 
+
+Loading text image:  datasets/avery_sgra_eofn.txt
+iteration:   0%|          | 0/20000 [00:00<?, ?it/s]
+iteration 0, loss=8.545611572e+01
+iteration 1000, loss=1.037307143e+00
+iteration 2000, loss=9.937213659e-01
+iteration 3000, loss=9.905568361e-01
+iteration 4000, loss=9.913056493e-01
+iteration 5000, loss=9.923481941e-01
+iteration 6000, loss=9.916571975e-01
+iteration 7000, loss=9.792367220e-01
+iteration 8000, loss=9.801911712e-01
+iteration 9000, loss=9.806839824e-01
+iteration 10000, loss=9.812992215e-01
+iteration 11000, loss=9.692292809e-01
+iteration 12000, loss=9.650498033e-01
+iteration 13000, loss=9.656311274e-01
+iteration 14000, loss=9.650980234e-01
+iteration 15000, loss=9.605043530e-01
+iteration 16000, loss=9.686177373e-01
+iteration 17000, loss=9.643362164e-01
+iteration 18000, loss=9.579368830e-01
+iteration 19000, loss=9.802001715e-01
+[seed=40] saved params to fourier_ensembling/bh_varnoise_models/params_40.msgpack

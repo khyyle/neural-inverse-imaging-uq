@@ -1,0 +1,25 @@
+Welcome to eht-imaging! v 1.2.10 
+
+(1024, 1024)
+iteration:   0%|          | 0/20000 [00:00<?, ?it/s]
+iteration 0, loss=7.227580547e-01
+iteration 1000, loss=1.396587701e-03
+iteration 2000, loss=5.624764133e-03
+iteration 3000, loss=7.445444498e-05
+iteration 4000, loss=3.925106648e-05
+iteration 5000, loss=1.222582068e-04
+iteration 6000, loss=2.865473041e-03
+iteration 7000, loss=1.764017856e-03
+iteration 8000, loss=3.873181122e-04
+iteration 9000, loss=5.434994091e-05
+iteration 10000, loss=7.431072504e-07
+iteration 11000, loss=3.415009996e-05
+iteration 12000, loss=1.727732160e-05
+iteration 13000, loss=3.009610694e-08
+iteration 14000, loss=7.038997163e-11
+iteration 15000, loss=2.188899551e-08
+iteration 16000, loss=2.021343789e-06
+iteration 17000, loss=2.711121851e-06
+iteration 18000, loss=8.821263691e-06
+iteration 19000, loss=2.878342229e-06
+[seed=75] saved params to fourier_ensembling/starfish_models/params_75.msgpack

@@ -1,2 +1,7 @@
 venv/
 __pycache__/
+bh_vlbi_unc_results/
+black_hole_unc_results/
+cameraman_unc_results/
+*.msgpack
+2dct_br/ct_unc_results/

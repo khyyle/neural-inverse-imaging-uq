@@ -1,0 +1,52 @@
+2025-07-08 19:31:18.022596: E external/xla/xla/stream_executor/cuda/cuda_dnn.cc:439] Could not create cudnn handle: CUDNN_STATUS_INTERNAL_ERROR
+2025-07-08 19:31:18.022654: E external/xla/xla/stream_executor/cuda/cuda_dnn.cc:443] Memory usage: 3801088 bytes free, 11546394624 bytes total.
+Traceback (most recent call last):
+  File "/srv/tmp/kyle/bh_imaging/camera_ensemble/run_camera_ensemble.py", line 31, in <module>
+    intensity_gt = jnp.array(img, dtype=jnp.float32) / 255.0
+  File "/srv/tmp/kyle/eht/lib/python3.9/site-packages/jax/_src/numpy/array_methods.py", line 258, in deferring_binary_op
+    return binary_op(*args)
+  File "/srv/tmp/kyle/eht/lib/python3.9/site-packages/jax/_src/traceback_util.py", line 166, in reraise_with_filtered_traceback
+    return fun(*args, **kwargs)
+  File "/srv/tmp/kyle/eht/lib/python3.9/site-packages/jax/_src/pjit.py", line 250, in cache_miss
+    outs, out_flat, out_tree, args_flat, jaxpr = _python_pjit_helper(
+  File "/srv/tmp/kyle/eht/lib/python3.9/site-packages/jax/_src/pjit.py", line 163, in _python_pjit_helper
+    out_flat = pjit_p.bind(*args_flat, **params)
+  File "/srv/tmp/kyle/eht/lib/python3.9/site-packages/jax/_src/core.py", line 2677, in bind
+    return self.bind_with_trace(top_trace, args, params)
+  File "/srv/tmp/kyle/eht/lib/python3.9/site-packages/jax/_src/core.py", line 383, in bind_with_trace
+    out = trace.process_primitive(self, map(trace.full_raise, args), params)
+  File "/srv/tmp/kyle/eht/lib/python3.9/site-packages/jax/_src/core.py", line 815, in process_primitive
+    return primitive.impl(*tracers, **params)
+  File "/srv/tmp/kyle/eht/lib/python3.9/site-packages/jax/_src/pjit.py", line 1203, in _pjit_call_impl
+    return xc._xla.pjit(name, f, call_impl_cache_miss, [], [], donated_argnums,
+  File "/srv/tmp/kyle/eht/lib/python3.9/site-packages/jax/_src/pjit.py", line 1187, in call_impl_cache_miss
+    out_flat, compiled = _pjit_call_impl_python(
+  File "/srv/tmp/kyle/eht/lib/python3.9/site-packages/jax/_src/pjit.py", line 1120, in _pjit_call_impl_python
+    compiled = _pjit_lower(
+  File "/srv/tmp/kyle/eht/lib/python3.9/site-packages/jax/_src/interpreters/pxla.py", line 2323, in compile
+    executable = UnloadedMeshExecutable.from_hlo(
+  File "/srv/tmp/kyle/eht/lib/python3.9/site-packages/jax/_src/interpreters/pxla.py", line 2645, in from_hlo
+    xla_executable, compile_options = _cached_compilation(
+  File "/srv/tmp/kyle/eht/lib/python3.9/site-packages/jax/_src/interpreters/pxla.py", line 2555, in _cached_compilation
+    xla_executable = dispatch.compile_or_get_cached(
+  File "/srv/tmp/kyle/eht/lib/python3.9/site-packages/jax/_src/dispatch.py", line 497, in compile_or_get_cached
+    return backend_compile(backend, computation, compile_options,
+  File "/srv/tmp/kyle/eht/lib/python3.9/site-packages/jax/_src/profiler.py", line 314, in wrapper
+    return func(*args, **kwargs)
+  File "/srv/tmp/kyle/eht/lib/python3.9/site-packages/jax/_src/dispatch.py", line 465, in backend_compile
+    return backend.compile(built_c, compile_options=options)
+jax._src.traceback_util.UnfilteredStackTrace: jaxlib.xla_extension.XlaRuntimeError: FAILED_PRECONDITION: DNN library initialization failed. Look at the errors above for more details.
+
+The stack trace below excludes JAX-internal frames.
+The preceding is the original exception that occurred, unmodified.
+
+--------------------
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/srv/tmp/kyle/bh_imaging/camera_ensemble/run_camera_ensemble.py", line 31, in <module>
+    intensity_gt = jnp.array(img, dtype=jnp.float32) / 255.0
+  File "/srv/tmp/kyle/eht/lib/python3.9/site-packages/jax/_src/numpy/array_methods.py", line 258, in deferring_binary_op
+    return binary_op(*args)
+jaxlib.xla_extension.XlaRuntimeError: FAILED_PRECONDITION: DNN library initialization failed. Look at the errors above for more details.
