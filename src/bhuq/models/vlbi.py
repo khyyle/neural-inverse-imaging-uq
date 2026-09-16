@@ -1,4 +1,4 @@
-"""Coordinate MLP used by the original VLBI reconstruction."""
+"""Coordinate MLP used by VLBI reconstruction."""
 
 from __future__ import annotations
 
@@ -177,8 +177,8 @@ class NeuralImage(nn.Module):
     use_skip_connections: bool
         Whether the MLP reinjects the encoded coordinates.
     output_logit_offset: float
-        Value subtracted from the output logit before the sigmoid. The
-        original black-hole model uses ten so an untrained model begins dark.
+        Value subtracted from the output logit before the sigmoid so
+        an untrained model begins dark.
     """
 
     positional_encoding_degree: int = 3

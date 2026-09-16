@@ -24,7 +24,11 @@ class LinearOperator(Protocol):
         """Shape of measurements returned by the operator."""
         ...
 
-    def apply(self, image: ArrayLike) -> jax.Array:
+    def apply(
+        self,
+        image: ArrayLike,
+        measurement_indices: ArrayLike | None = None,
+    ) -> jax.Array:
         """
         Map an image into flattened measurement space.
 
@@ -32,6 +36,9 @@ class LinearOperator(Protocol):
         -----------
         image: ArrayLike
             Image with `image_shape`, or the equivalent flattened vector.
+        measurement_indices: ArrayLike | None
+            Optional flattened measurement indices to evaluate. `None`
+            evaluates every measurement.
 
         Returns:
         --------
@@ -92,15 +99,22 @@ class DenseLinearOperator:
         """One-dimensional output shape of the dense matrix."""
         return (self.matrix.shape[0],)
 
-    def apply(self, image: ArrayLike) -> jax.Array:
-        """Multiply the dense matrix by a row-major flattened image."""
+    def apply(
+        self,
+        image: ArrayLike,
+        measurement_indices: ArrayLike | None = None,
+    ) -> jax.Array:
+        """Multiply selected dense-matrix rows by a flattened image."""
         image_array = jnp.asarray(image)
         if image_array.size != self.matrix.shape[1]:
             raise ValueError(
                 f"`image` contains {image_array.size} values; expected "
                 f"{self.matrix.shape[1]}."
             )
-        return jnp.asarray(self.matrix) @ image_array.reshape(-1)
+        matrix = jnp.asarray(self.matrix)
+        if measurement_indices is not None:
+            matrix = matrix[jnp.asarray(measurement_indices)]
+        return matrix @ image_array.reshape(-1)
 
     def apply_to_columns(self, image_columns: ArrayLike) -> jax.Array:
         """Multiply the dense matrix by one or more flattened image columns."""

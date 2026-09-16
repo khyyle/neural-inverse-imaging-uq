@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import jax
+import jax.numpy as jnp
 import numpy as np
 from jax.typing import ArrayLike
 
@@ -90,7 +91,11 @@ class LinearInverseProblem:
         """Two-dimensional image shape accepted by the operator."""
         return self.operator.image_shape
 
-    def predict(self, image: ArrayLike) -> jax.Array:
+    def predict(
+        self,
+        image: ArrayLike,
+        measurement_indices: ArrayLike | None = None,
+    ) -> jax.Array:
         """
         Apply the fixed measurement operator to an image.
 
@@ -99,13 +104,50 @@ class LinearInverseProblem:
         image: ArrayLike
             Image with shape `image_shape`, or an already flattened vector with
             `number_of_pixels` entries.
+        measurement_indices: ArrayLike | None
+            Optional flattened measurement indices to evaluate.
 
         Returns:
         --------
         jax.Array
-            Predicted measurements with shape `(number_of_measurements,)`.
+            All predicted measurements, or only the requested subset.
         """
-        return self.operator.apply(image)
+        return self.operator.apply(image, measurement_indices)
+
+    def gaussian_negative_log_likelihood(
+        self,
+        image: ArrayLike,
+        measurement_indices: ArrayLike | None = None,
+    ) -> jax.Array:
+        """
+        Evaluate the Gaussian data term up to additive constants.
+
+        Parameters:
+        -----------
+        image: ArrayLike
+            Image accepted by `predict`.
+        measurement_indices: ArrayLike | None
+            Optional flattened measurement indices to evaluate.
+
+        Returns:
+        --------
+        jax.Array
+            Scalar `0.5 * mean(abs((prediction - observation) / sigma) ** 2)`.
+
+        Notes:
+        ------
+        For complex measurements, `sigma` is the standard deviation of each
+        independent real and imaginary component.
+        """
+        predictions = self.predict(image, measurement_indices)
+        observations = jnp.asarray(self.observed_measurements)
+        noise = jnp.asarray(self.noise_standard_deviation)
+        if measurement_indices is not None:
+            indices = jnp.asarray(measurement_indices)
+            observations = observations[indices]
+            noise = noise[indices]
+        normalized_residuals = (predictions - observations) / noise
+        return 0.5 * jnp.mean(jnp.abs(normalized_residuals) ** 2)
 
     def apply_to_columns(self, image_columns: ArrayLike) -> jax.Array:
         """

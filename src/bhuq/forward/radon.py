@@ -171,7 +171,11 @@ class RadonOperator:
         """Sinogram has shape `(number_of_angles, detector_count)`."""
         return (self.projection_angles_radians.size, self.image_shape[1])
 
-    def apply(self, image: ArrayLike) -> jax.Array:
+    def apply(
+        self,
+        image: ArrayLike,
+        measurement_indices: ArrayLike | None = None,
+    ) -> jax.Array:
         """
         Project one image.
 
@@ -179,6 +183,8 @@ class RadonOperator:
         -----------
         image: ArrayLike
             Image with shape `(H, W)` or the equivalent vector `(H * W,)`.
+        measurement_indices: ArrayLike | None
+            Optional indices selected after computing the complete sinogram.
 
         Returns:
         --------
@@ -197,7 +203,10 @@ class RadonOperator:
             jnp.asarray(self.projection_angles_radians),
             interpolation_order=self.interpolation_order,
         )
-        return sinogram.reshape(-1)
+        flattened_sinogram = sinogram.reshape(-1)
+        if measurement_indices is not None:
+            return flattened_sinogram[jnp.asarray(measurement_indices)]
+        return flattened_sinogram
 
     def apply_to_columns(self, image_columns: ArrayLike) -> jax.Array:
         """
