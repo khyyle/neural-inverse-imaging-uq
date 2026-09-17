@@ -132,6 +132,7 @@ def build_vlbi_inverse_problem(
         Number of pixels along each side of the square reconstruction grid.
     field_of_view_radians: float
         Angular width of the square reconstruction grid in radians.
+
     Returns:
     --------
     LinearInverseProblem

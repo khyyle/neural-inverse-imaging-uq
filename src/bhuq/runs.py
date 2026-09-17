@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import platform
 import subprocess
 import sys
 import time
@@ -37,18 +36,28 @@ def json_value(value: Any) -> Any:
     return value
 
 
-def describe_file(path: str | Path) -> dict[str, Any]:
-    """Return an absolute path, byte size, and SHA-256 digest."""
+def describe_file(
+    path: str | Path,
+    *,
+    relative_to: str | Path | None = None,
+) -> dict[str, Any]:
+    """Return a portable path, byte size, and SHA-256 digest."""
     file_path = Path(path).resolve()
     if not file_path.is_file():
         raise FileNotFoundError(file_path)
+    recorded_path = file_path
+    if relative_to is not None:
+        try:
+            recorded_path = file_path.relative_to(Path(relative_to).resolve())
+        except ValueError:
+            pass
 
     digest = hashlib.sha256()
     with file_path.open("rb") as input_file:
         for chunk in iter(lambda: input_file.read(1024 * 1024), b""):
             digest.update(chunk)
     return {
-        "path": str(file_path),
+        "path": str(recorded_path),
         "size_bytes": file_path.stat().st_size,
         "sha256": digest.hexdigest(),
     }
@@ -57,15 +66,13 @@ def describe_file(path: str | Path) -> dict[str, Any]:
 def collect_runtime_metadata(
     repository_root: str | Path,
 ) -> dict[str, Any]:
-    """Collect Git, command, host, and platform metadata."""
+    """Collect Git and command metadata."""
     resolved_root = Path(repository_root).resolve()
     dirty_output = _git_output(resolved_root, "status", "--porcelain")
     return {
         "git_commit": _git_output(resolved_root, "rev-parse", "HEAD"),
         "git_dirty": bool(dirty_output),
         "command": sys.argv,
-        "host": platform.node(),
-        "platform": platform.platform(),
     }
 
 
@@ -80,8 +87,8 @@ class ExperimentRun:
     While the context is active, callers may record input files, metrics,
     numerical arrays, model evaluations, and any number of figures. Every
     artifact receives a digest and an entry in `artifacts.json`. Saving a model
-    evaluation also records its saved-model manifest, training provenance, and
-    parameter checkpoints automatically.
+    evaluation also records hashes of its saved-model manifest and training
+    provenance.
 
     Leaving the context writes terminal metrics and provenance, appends the
     run to `results_root/index.jsonl`, and records exceptions as failed runs.
@@ -157,7 +164,10 @@ class ExperimentRun:
         None
         """
         self._require_started()
-        self.inputs[name] = describe_file(path)
+        self.inputs[name] = describe_file(
+            path,
+            relative_to=self.repository_root,
+        )
         self._write_provenance(status="running")
 
     def log_metric(self, name: str, value: Any) -> None:
@@ -286,16 +296,7 @@ class ExperimentRun:
         return self.save_arrays(
             f"{name}_uncertainty",
             metadata={
-                "saved_model": {
-                    "model_name": evaluation.saved_model.model_name,
-                    "model_id": evaluation.saved_model.model_id,
-                    "directory": str(
-                        evaluation.saved_model.directory.resolve()
-                    ),
-                    "manifest_sha256": describe_file(
-                        evaluation.saved_model.manifest_path
-                    )["sha256"],
-                },
+                "saved_model_reference": name,
                 "methods": evaluation.config.methods,
             },
             **evaluation.arrays,
@@ -319,7 +320,6 @@ class ExperimentRun:
                         "run": str(run_directory),
                         "experiment": self.name,
                         "status": status,
-                        "metrics": self.metrics,
                     },
                     sort_keys=True,
                 )
@@ -428,25 +428,19 @@ class ExperimentRun:
         )
 
     def _record_saved_model(self, name: str, saved_model: Any) -> None:
-        """Record one saved model and all of its parameter checkpoints."""
+        """Record one immutable saved-model reference."""
         self._require_started()
         self.saved_models[name] = {
             "model_name": saved_model.model_name,
             "model_id": saved_model.model_id,
-            "directory": str(saved_model.directory.resolve()),
             "manifest_sha256": describe_file(
                 saved_model.manifest_path
             )["sha256"],
+            "provenance_sha256": describe_file(
+                saved_model.provenance_path
+            )["sha256"],
         }
-        self.record_input(f"{name}/manifest", saved_model.manifest_path)
-        self.record_input(f"{name}/provenance", saved_model.provenance_path)
-        for member_index, checkpoint_path in enumerate(
-            saved_model.checkpoint_paths
-        ):
-            self.record_input(
-                f"{name}/checkpoint_{member_index}",
-                checkpoint_path,
-            )
+        self._write_provenance(status="running")
 
     def _write_json(self, name: str, payload: Any) -> None:
         """Write JSON inside the active run directory."""

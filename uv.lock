@@ -167,11 +167,13 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "ehtim" },
+    { name = "finufft" },
     { name = "flax" },
     { name = "jax" },
     { name = "matplotlib" },
     { name = "numpy" },
     { name = "optax" },
+    { name = "paramsurvey" },
     { name = "scikit-image" },
     { name = "scipy" },
     { name = "tqdm" },
@@ -195,13 +197,15 @@ notebooks = [
 
 [package.metadata]
 requires-dist = [
-    { name = "ehtim", specifier = "==1.3.2" },
+    { name = "ehtim", git = "https://github.com/achael/eht-imaging.git?rev=9d29103abb8c343b566c4522f60da7b792fb5934" },
+    { name = "finufft", specifier = "==2.5.1" },
     { name = "flax", specifier = "==0.12.9" },
     { name = "imageio", marker = "extra == 'image-examples'", specifier = "==2.37.4" },
     { name = "jax", specifier = "==0.11.1" },
     { name = "matplotlib", specifier = "==3.11.2" },
     { name = "numpy", specifier = "==2.5.3" },
     { name = "optax", specifier = "==0.2.8" },
+    { name = "paramsurvey", specifier = "==0.4.21" },
     { name = "pillow", marker = "extra == 'image-examples'", specifier = "==12.3.0" },
     { name = "scikit-image", specifier = "==0.26.0" },
     { name = "scipy", specifier = "==1.18.1" },
@@ -395,24 +399,19 @@ wheels = [
 
 [[package]]
 name = "ehtim"
-version = "1.3.2"
-source = { registry = "https://pypi.org/simple" }
+version = "1.4.0"
+source = { git = "https://github.com/achael/eht-imaging.git?rev=9d29103abb8c343b566c4522f60da7b792fb5934#9d29103abb8c343b566c4522f60da7b792fb5934" }
 dependencies = [
     { name = "astropy" },
+    { name = "finufft" },
     { name = "future" },
     { name = "h5py" },
     { name = "matplotlib" },
     { name = "networkx" },
     { name = "numpy" },
-    { name = "pandas" },
-    { name = "paramsurvey" },
     { name = "requests" },
     { name = "scipy" },
     { name = "skyfield" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/66/8f/d9a49fd5d39a826a89723391a7bcc59f1084c093b847178911b424bee46f/ehtim-1.3.2.tar.gz", hash = "sha256:2d90fb35fd7f462e3988ee026b1d3468f7195db6dab5d52a556208cf7ffb802e", size = 399709, upload-time = "2026-06-16T21:42:48.206Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/f1/89/d4b7b30ee76c86e24a62f3379a3f9f8a7210831ab1047515898b6afa2591/ehtim-1.3.2-py3-none-any.whl", hash = "sha256:39403ff040e7828fbfbb3344f24a9bf7ce4802f141a68c56c5918e8f5a17d3af", size = 411813, upload-time = "2026-06-16T21:42:46.737Z" },
 ]
 
 [[package]]
@@ -450,6 +449,24 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/33/a4/9473c7c3b87009d9c1d74034e4a0f6a35ff0d42dd0f9866d0c3ec4e9217b/fastjsonschema-2.22.2.tar.gz", hash = "sha256:72064e12356a7d6ef02165be2946b9abadbdf238536e07eb587e3dbaa33099cf", size = 385171, upload-time = "2026-08-15T19:47:08.853Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/49/82/2755c7c982086f00d4dab85bc120ec35045a9fc2191893a6ce79afe94443/fastjsonschema-2.22.2-py3-none-any.whl", hash = "sha256:0fb3915616adac85ccfdd737d26be1089845d2019819505b42d39888458f74d4", size = 27413, upload-time = "2026-08-15T19:47:04.406Z" },
+]
+
+[[package]]
+name = "finufft"
+version = "2.5.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+    { name = "packaging" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/e0/a6/7cbd2b05862878673f9c8d61a31095a7e96897f7debcdb78231e4ad1c447/finufft-2.5.1.tar.gz", hash = "sha256:b0c630717442cb3519948e5f73b5dee68871c0f0e3b8c2eafbec0fcccf89f6b9", size = 120733, upload-time = "2026-04-09T19:25:35.965Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b1/8c/2cb49aa7d6adfeb455bb544d18bf7777da1c0b7b239830d795b866ac3a46/finufft-2.5.1-py3-none-macosx_14_0_arm64.whl", hash = "sha256:3f57c3ab02a050980ba578d9f322305e77f538009ebf8cb70df77c95443f031e", size = 2731206, upload-time = "2026-04-08T23:41:58.281Z" },
+    { url = "https://files.pythonhosted.org/packages/10/3c/405e041c13e625833002bf99934c760f74c01d44b7d84796a52847208741/finufft-2.5.1-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:3b20990fa7cfad54f63118b2e95a908c91dbcbb01e4c544755985ccbe6216aa6", size = 7804274, upload-time = "2026-04-08T23:41:59.956Z" },
+    { url = "https://files.pythonhosted.org/packages/74/4b/b88cd3266c653f871c3c93504d0b9edca22d1e725a64b67a3c53ad7b2896/finufft-2.5.1-py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:2cec94f1dfe45f77d92b9a4cd523445f4d51c10d0a74d3eaf3c90f17293693f0", size = 7632155, upload-time = "2026-04-08T23:42:01.542Z" },
+    { url = "https://files.pythonhosted.org/packages/ff/7f/55ca2e564fdf83d8473befdaa4e52425d0f880f3302d7952f755c3412972/finufft-2.5.1-py3-none-musllinux_1_1_x86_64.whl", hash = "sha256:e3881a331360eba3f76b7f1c69d9b641e02ba05584da76cc221191c95c7be8da", size = 8366930, upload-time = "2026-04-08T23:42:03.185Z" },
+    { url = "https://files.pythonhosted.org/packages/ad/0f/e9bf300b8d6a76cb3e6d306c62688c8f4fac73250be9d073c5f17bdd77ba/finufft-2.5.1-py3-none-musllinux_1_2_x86_64.whl", hash = "sha256:8bb04c741b79e5de66010e6be17fd01eb2cf06c0557d58d89de4514d5a68cb37", size = 8638314, upload-time = "2026-04-08T23:42:04.817Z" },
+    { url = "https://files.pythonhosted.org/packages/05/98/a6632d986102cc94a0d9a6ff665c8d736c16ce462b0955c511e17d20b053/finufft-2.5.1-py3-none-win_amd64.whl", hash = "sha256:496ad48706e77f54078e31777bd4a30f33e788ae313ef30d8b1e7d41c7539788", size = 5881286, upload-time = "2026-04-08T23:42:07.132Z" },
 ]
 
 [[package]]

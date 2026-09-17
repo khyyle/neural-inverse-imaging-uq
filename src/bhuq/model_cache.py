@@ -89,6 +89,13 @@ class SavedModel:
         )
 
     @property
+    def member_seeds(self) -> tuple[int, ...]:
+        """Return member seeds in checkpoint order."""
+        return tuple(
+            int(member["seed"]) for member in self.manifest["members"]
+        )
+
+    @property
     def manifest_path(self) -> Path:
         return self.directory / "manifest.json"
 
@@ -251,7 +258,10 @@ def _save_model(
         loss_histories=loss_histories,
     )
     described_inputs = {
-        input_name: describe_file(input_path)
+        input_name: describe_file(
+            input_path,
+            relative_to=repository_root,
+        )
         for input_name, input_path in input_paths.items()
     }
     runtime_metadata = collect_runtime_metadata(repository_root)
@@ -265,10 +275,9 @@ def _save_model(
     checkpoint_directory.mkdir(parents=True, exist_ok=False)
 
     manifest_members = []
-    for seed, parameter_tree, final_loss in zip(
+    for seed, parameter_tree in zip(
         seeds,
         parameters,
-        final_losses,
         strict=True,
     ):
         checkpoint_path = checkpoint_directory / f"params_{seed}.msgpack"
@@ -277,7 +286,6 @@ def _save_model(
         manifest_members.append(
             {
                 "seed": int(seed),
-                "final_loss": float(final_loss),
                 "checkpoint": str(
                     checkpoint_path.relative_to(model_directory)
                 ),

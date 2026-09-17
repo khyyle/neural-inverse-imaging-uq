@@ -4,6 +4,7 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 model_cache/
+checkpoints/
 results/
 *.egg-info/
 bh_vlbi_unc_results/

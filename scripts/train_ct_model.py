@@ -22,7 +22,6 @@ LOGGER = logging.getLogger(__name__)
 
 
 def _default_training_config() -> TrainingConfig:
-    """Return optimizer settings matching the original CT experiment."""
     return TrainingConfig(
         number_of_steps=5_000,
         initial_learning_rate=5e-4,
@@ -35,8 +34,6 @@ def _default_training_config() -> TrainingConfig:
 
 @dataclass(frozen=True)
 class ProblemConfig:
-    """Inputs and settings used to generate the CT sinogram."""
-
     source_image_path: Path = Path("data/images/avery_sgra_eofn.txt")
     pixel_count: int = 128
     number_of_projection_angles: int = 40
@@ -46,8 +43,6 @@ class ProblemConfig:
 
 @dataclass(frozen=True)
 class ModelConfig:
-    """FourierFeatureMLP architecture and frequency settings."""
-
     number_of_frequencies: int = 256
     frequency_scale: float = 4.0
     frequency_seed: int = 10
@@ -64,7 +59,8 @@ CACHE_ROOT = Path("model_cache")
 
 
 def main() -> None:
-    """Construct the problem and train the configured model ensemble."""
+
+    # set up ground truth image
     source = eh.image.load_txt(str(PROBLEM.source_image_path))
     source_image = np.asarray(source.imarr(), dtype=np.float32)
     resized_image = resize_local_mean(
@@ -73,7 +69,9 @@ def main() -> None:
         grid_mode=True,
         preserve_range=True,
     )
-    truth = resized_image / float(resized_image.max())
+    truth = resized_image / float(resized_image.max()) # normalize pixel values to 0-1
+
+    # build the inverse problem
     angles = np.linspace(
         0.0,
         np.pi,
@@ -89,6 +87,8 @@ def main() -> None:
         ),
         interpolation_order=PROBLEM.interpolation_order,
     )
+
+    # setup a coordiante MLP with gaussian sampled fourier features
     coordinates = build_fourier_feature_coordinate_grid(problem.image_shape)
     frequencies = sample_gaussian_frequencies(
         jax.random.PRNGKey(MODEL.frequency_seed),

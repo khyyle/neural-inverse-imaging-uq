@@ -28,7 +28,7 @@ class ProblemConfig:
     scan_advance_seconds: float = 600.0
     start_time_hours: float = 0.0
     stop_time_hours: float = 24.0
-    transform_type: str = "direct"
+    transform_type: str = "nfft"
     add_thermal_noise: bool = False
 
 
@@ -49,30 +49,30 @@ CACHE_ROOT = Path("model_cache")
 
 
 def main() -> None:
-    """Construct the problem and train the configured model ensemble."""
+    # set up observation and ground truth
     source = eh.image.load_txt(str(PROBLEM.source_image_path))
-    telescope_array = eh.array.load_txt(
-        str(PROBLEM.telescope_array_path)
-    )
+    telescope_array = eh.array.load_txt(str(PROBLEM.telescope_array_path))
     observation = simulate_observation(
         source,
         telescope_array,
         bandwidth_hz=PROBLEM.bandwidth_hz,
-        integration_time_seconds=(
-            PROBLEM.integration_time_seconds
-        ),
+        integration_time_seconds=PROBLEM.integration_time_seconds,
         scan_advance_seconds=PROBLEM.scan_advance_seconds,
         start_time_hours=PROBLEM.start_time_hours,
         stop_time_hours=PROBLEM.stop_time_hours,
         transform_type=PROBLEM.transform_type,
         add_thermal_noise=PROBLEM.add_thermal_noise,
     )
+
+    # build the inverse problem
     problem = build_vlbi_inverse_problem(
         observation,
         pixel_count=PROBLEM.pixel_count,
         field_of_view_radians=source.fovx(),
     )
     coordinates = build_vlbi_coordinate_grid(problem.image_shape)
+
+    # setup coordinate MLP
     model = NeuralImage(
         positional_encoding_degree=(
             MODEL.positional_encoding_degree

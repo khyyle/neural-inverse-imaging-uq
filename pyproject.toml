@@ -9,12 +9,14 @@ description = "Research code for uncertainty quantification in neural VLBI imagi
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
-    "ehtim==1.3.2",
+    "ehtim @ git+https://github.com/achael/eht-imaging.git@9d29103abb8c343b566c4522f60da7b792fb5934",
+    "finufft==2.5.1",
     "flax==0.12.9",
     "jax==0.11.1",
     "matplotlib==3.11.2",
     "numpy==2.5.3",
     "optax==0.2.8",
+    "paramsurvey==0.4.21",
     "scikit-image==0.26.0",
     "scipy==1.18.1",
     "tqdm==4.70.1",

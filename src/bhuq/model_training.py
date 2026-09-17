@@ -66,7 +66,7 @@ class TrainedModel:
     training_started_at: datetime
         UTC time at which optimization began.
     training_elapsed_seconds: float
-        Wall-clock duration of the saved training operation.
+        Wall-clock duration of the training operation.
     saved_model: SavedModel | None
         Persistent cache identity, or `None` when saving was disabled.
     """
@@ -97,7 +97,6 @@ class _ModelTrainingMetadata:
     model: Any
     problem: Any
     optimization: TrainingConfig
-    seeds: tuple[int, ...]
 
 
 def train_model(
@@ -144,6 +143,7 @@ def train_model(
         Source files hashed into saved-model provenance.
     cache_root: str | Path
         Parent directory for saved models.
+
     Returns:
     --------
     TrainedModel
@@ -195,7 +195,6 @@ def train_model(
             model=model_metadata,
             problem=problem_metadata,
             optimization=config,
-            seeds=resolved_seeds,
         )
         saved_model = _save_model(
             model_name=model_name,
@@ -249,7 +248,7 @@ def load_model(
     Returns:
     --------
     TrainedModel
-        Loaded parameter trees, histories, metadata, and saved identity.
+        Loaded parameter trees, diagnostics, metadata, and saved identity.
 
     Raises:
     -------
@@ -282,8 +281,9 @@ def load_model(
             "Saved parameters and training histories have different lengths."
         )
     members = []
-    for parameter_tree, history in zip(
+    for parameter_tree, manifest_seed, history in zip(
         parameters,
+        saved_model.member_seeds,
         histories,
         strict=True,
     ):
@@ -292,9 +292,14 @@ def load_model(
             raise ValueError(
                 "Each saved member must contain a training history."
             )
+        history_seed = int(history["seed"])
+        if history_seed != manifest_seed:
+            raise ValueError(
+                "Saved checkpoint and training-history seeds differ."
+            )
         members.append(
             TrainedModelMember(
-                seed=int(history["seed"]),
+                seed=manifest_seed,
                 parameters=parameter_tree,
                 final_loss=float(history["final_loss"]),
                 recorded_steps=np.asarray(
