@@ -1,5 +1,11 @@
+.venv/
 venv/
 __pycache__/
+.pytest_cache/
+.ruff_cache/
+model_cache/
+results/
+*.egg-info/
 bh_vlbi_unc_results/
 black_hole_unc_results/
 cameraman_unc_results/

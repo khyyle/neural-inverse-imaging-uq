@@ -23,7 +23,7 @@ def load_img(image_type):
     xdim: int
     ydim: int
     if image_type == 'black hole':
-        image_path = 'datasets/avery_sgra_eofn.txt'
+        image_path = 'data/images/avery_sgra_eofn.txt'
         image_true = eh.image.load_txt(image_path)
         image_true.display()
 
@@ -44,7 +44,7 @@ def load_img(image_type):
         plt.axis('off')
         plt.show()
     elif image_type == 'starfish':
-        img = Image.open('datasets/starfish.png').convert('RGB')
+        img = Image.open('data/images/starfish.png').convert('RGB')
         print(img.size)
         W, H = img.size
         scale = 256/max(W, H)

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
 from dataclasses import dataclass, replace
 from typing import Any, Literal
 
@@ -17,7 +16,6 @@ from tqdm.auto import tqdm
 from .forward import LinearInverseProblem
 
 type ParameterTree = Any
-type ProgressCallback = Callable[[int, float], None]
 type LearningRateSchedule = Literal["constant", "linear", "cosine"]
 
 SUPPORTED_LEARNING_RATE_SCHEDULES: tuple[LearningRateSchedule, ...] = (
@@ -131,8 +129,6 @@ def fit_linear_inverse_problem(
     coordinates: jax.Array,
     problem: LinearInverseProblem,
     config: TrainingConfig,
-    *,
-    progress: ProgressCallback | None = None,
 ) -> TrainingResult:
     """
     Fit a Flax image model to linear measurements.
@@ -150,9 +146,6 @@ def fit_linear_inverse_problem(
         Fixed measurement operator, observations, and noise.
     config: TrainingConfig
         Optimization settings.
-    progress: ProgressCallback | None
-        Optional callback receiving `(step, batch_loss)` at each recorded step.
-
     Returns:
     --------
     TrainingResult
@@ -231,8 +224,6 @@ def fit_linear_inverse_problem(
             loss_value = float(loss)
             recorded_steps.append(step)
             loss_history.append(loss_value)
-            if progress is not None:
-                progress(step, loss_value)
 
     final_image = state.apply_fn(
         {"params": state.params},
@@ -256,9 +247,7 @@ def fit_ensemble(
     coordinates: jax.Array,
     problem: LinearInverseProblem,
     config: TrainingConfig,
-    seeds: Sequence[int],
-    *,
-    progress: Callable[[int, int, float], None] | None = None,
+    seeds: tuple[int, ...],
 ) -> list[TrainingResult]:
     """
     Fit independent ensemble members with different random seeds.
@@ -273,11 +262,8 @@ def fit_ensemble(
         Shared measurement system.
     config: TrainingConfig
         Base optimization settings. Its seed is replaced for each member.
-    seeds: Sequence[int]
+    seeds: tuple[int, ...]
         Initialization and batching seeds.
-    progress: Callable[[int, int, float], None] | None
-        Optional callback receiving `(seed, step, batch_loss)`.
-
     Returns:
     --------
     list[TrainingResult]
@@ -285,23 +271,12 @@ def fit_ensemble(
     """
     results: list[TrainingResult] = []
     for seed in seeds:
-        member_progress = None
-        if progress is not None:
-            def report_member_progress(
-                step: int,
-                loss: float,
-                member_seed: int = seed,
-            ) -> None:
-                progress(member_seed, step, loss)
-
-            member_progress = report_member_progress
         results.append(
             fit_linear_inverse_problem(
                 model,
                 coordinates,
                 problem,
                 replace(config, seed=seed),
-                progress=member_progress,
             )
         )
     return results

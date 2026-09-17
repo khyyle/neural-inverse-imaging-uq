@@ -17,8 +17,8 @@ import sys
 from datetime import datetime
 
 # %%
-image_path = 'datasets/avery_sgra_eofn.txt'
-array_path = 'datasets/EHT2017.txt'
+image_path = 'data/images/avery_sgra_eofn.txt'
+array_path = 'data/vlbi/EHT2017.txt'
 image_true = eh.image.load_txt(image_path)
 array = eh.array.load_txt(array_path)
 
