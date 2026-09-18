@@ -64,7 +64,7 @@ def linearized_parameter_laplace(
     curvature: LaplaceCurvature = "lanczos",
     rank: int = 50,
     random_seed: int = 0,
-    map_chunk_size: int = 4_096,
+    map_chunk_size: int = 4096,
     dense_memory_warning_bytes: int = DEFAULT_DENSE_MEMORY_WARNING_BYTES,
 ) -> LinearizedLaplaceResult:
     """

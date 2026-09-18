@@ -30,7 +30,6 @@ from .training import TrainingConfig
 LOGGER = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-REMOTE_SOURCE_ROOT = Path("/root/src")
 REMOTE_SCRIPT_ROOT = Path("/root/scripts")
 DEFAULT_MODAL_GPU = "A10G"
 DEFAULT_TIMEOUT_SECONDS = 60 * 60
@@ -167,8 +166,8 @@ modal_image = (
     .apt_install("git")
     .uv_sync(uv_project_dir=str(PROJECT_ROOT))
     .uv_pip_install("jax[cuda12]==0.11.1")
-    .env({"PYTHONPATH": (f"{REMOTE_SOURCE_ROOT}:{REMOTE_SCRIPT_ROOT}")})
-    .add_local_dir(PROJECT_ROOT / "src", remote_path=REMOTE_SOURCE_ROOT)
+    .env({"PYTHONPATH": str(REMOTE_SCRIPT_ROOT)})
+    .add_local_python_source("bhuq")
     .add_local_dir(PROJECT_ROOT / "scripts", remote_path=REMOTE_SCRIPT_ROOT)
 )
 app = modal.App("bhuq-ensemble-training")
@@ -186,11 +185,11 @@ def _train_member(
 ) -> dict[str, Any]:
     """Train one member and return host-resident parameters and diagnostics."""
     with tempfile.TemporaryDirectory() as directory:
-        remote_problem_config = _stage_problem_config(
+        remote_problem_config = _stage_problem_inputs(
             request,
             Path(directory),
         )
-        builder = _load_training_builder(request.builder_path)
+        builder = _import_training_builder(request.builder_path)
         model, coordinates, problem = builder(
             remote_problem_config,
             request.model_config,
@@ -263,7 +262,7 @@ def train_ensemble_on_modal(
             member["devices"],
         )
 
-    builder = _load_training_builder(request.builder_path)
+    builder = _import_training_builder(request.builder_path)
     model, coordinates, problem = builder(
         request.problem_config,
         request.model_config,
@@ -288,11 +287,11 @@ def train_ensemble_on_modal(
     )
 
 
-def _stage_problem_config(
+def _stage_problem_inputs(
     request: ModalTrainingRequest,
     input_directory: Path,
 ) -> Any:
-    """Replace local problem paths with temporary container paths."""
+    """Materialize input bytes and point the problem config at those files."""
     replacements = {}
     for field_name, filename, contents in request.staged_inputs:
         remote_path = input_directory / field_name / Path(filename).name
@@ -302,7 +301,7 @@ def _stage_problem_config(
     return replace(request.problem_config, **replacements)
 
 
-def _load_training_builder(builder_path: str) -> TrainingBuilder:
+def _import_training_builder(builder_path: str) -> TrainingBuilder:
     """Import a domain training builder from its stable module path."""
     module_name, _, function_name = builder_path.partition(":")
     module = importlib.import_module(module_name)
