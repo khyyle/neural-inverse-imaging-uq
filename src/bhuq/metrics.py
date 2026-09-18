@@ -33,6 +33,11 @@ class SparsificationResult:
     oracle_ranked_error: np.ndarray
     area_under_sparsification_error: float
 
+    @property
+    def sparsification_error(self) -> np.ndarray:
+        """Return the pointwise gap above the oracle sparsification curve."""
+        return self.uncertainty_ranked_error - self.oracle_ranked_error
+
 
 def sparsification_curve(
     uncertainty: np.ndarray,

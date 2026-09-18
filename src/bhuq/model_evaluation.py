@@ -12,7 +12,7 @@ from flax import linen as nn
 from .evaluation import (
     UncertaintyEvaluationConfig,
     UncertaintyEvaluationResult,
-    compute_uncertainty_maps,
+    compute_uncertainty_results,
     evaluate_uncertainty,
 )
 from .forward import LinearInverseProblem
@@ -129,7 +129,7 @@ def evaluate_model(
             sample_coordinates,
         )
 
-    maps = compute_uncertainty_maps(
+    uncertainty_results = compute_uncertainty_results(
         forward_model=problem,
         reconstruction=member_images[best_member_index],
         reference_parameters=parameters[best_member_index],
@@ -138,14 +138,14 @@ def evaluate_model(
         render_at_coordinates=render_at_coordinates,
         config=config,
     )
-    uncertainty = evaluate_uncertainty(
-        maps,
+    uncertainty_evaluation = evaluate_uncertainty(
+        uncertainty_results,
         truth,
         member_losses,
         best_member_index,
     )
     return ModelEvaluationResult(
-        uncertainty=uncertainty,
+        uncertainty=uncertainty_evaluation,
         config=config,
         saved_model=trained_model.saved_model,
     )

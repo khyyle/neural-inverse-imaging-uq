@@ -14,6 +14,13 @@ from typing import Any
 
 import numpy as np
 
+from .evaluation import UncertaintyEvaluationResult
+
+ARRAY_ARTIFACT_DIRECTORY = "arrays"
+FIGURE_ARTIFACT_DIRECTORY = "figures"
+UNCERTAINTY_EVALUATION_SCHEMA = "uncertainty_evaluation"
+UNCERTAINTY_EVALUATION_SCHEMA_VERSION = 1
+
 
 def json_value(value: Any) -> Any:
     if isinstance(value, Path):
@@ -88,10 +95,13 @@ class ExperimentRun:
     numerical arrays, model evaluations, and any number of figures. Every
     artifact receives a digest and an entry in `artifacts.json`. Saving a model
     evaluation also records hashes of its saved-model manifest and training
-    provenance.
+    provenance. Numerical archives are stored under `artifacts/arrays/` and
+    figures under `artifacts/figures/`.
 
     Leaving the context writes terminal metrics and provenance, appends the
     run to `results_root/index.jsonl`, and records exceptions as failed runs.
+    Array artifacts from completed runs can be loaded by semantic name with
+    `ExperimentRun.load_arrays()`.
 
     Parameters:
     -----------
@@ -113,6 +123,11 @@ class ExperimentRun:
         run.save_evaluation("sgr_a", evaluation)
         run.save_figure("uncertainty_maps", uncertainty_figure)
         run.save_figure("sparsification", sparsification_figure)
+
+    arrays = ExperimentRun.load_arrays(
+        run.run_directory,
+        "sgr_a_uncertainty",
+    )
     ```
     """
 
@@ -147,6 +162,103 @@ class ExperimentRun:
         self._started_at: datetime | None = None
         self._start_time: float | None = None
         self._is_finished = False
+
+    @staticmethod
+    def load_arrays(
+        run_directory: str | Path,
+        name: str,
+    ) -> dict[str, np.ndarray]:
+        """
+        Load a named NPZ artifact from an existing experiment run.
+
+        Parameters:
+        -----------
+        run_directory: str | Path
+            Directory created by `ExperimentRun`.
+        name: str
+            Semantic name of an artifact saved with `save_arrays()`.
+
+        Returns:
+        --------
+        dict[str, np.ndarray]
+            Arrays keyed by their names inside the NPZ archive.
+
+        Raises:
+        -------
+        KeyError
+            If the artifact name is not present.
+        TypeError
+            If the named artifact is not an array artifact.
+        FileNotFoundError
+            If the run directory, manifest, or artifact file is missing.
+        ValueError
+            If the manifest is invalid or its artifact path leaves the run.
+        """
+        resolved_run_directory = Path(run_directory).resolve()
+        if not resolved_run_directory.is_dir():
+            raise FileNotFoundError(resolved_run_directory)
+        artifacts = _read_json_object(resolved_run_directory / "artifacts.json")
+
+        try:
+            artifact = artifacts[name]
+        except KeyError as error:
+            raise KeyError(f"Unknown experiment artifact: {name}.") from error
+        if artifact.get("kind") != "arrays":
+            raise TypeError(f"`{name}` is not an array artifact.")
+
+        artifact_path = (resolved_run_directory / artifact["path"]).resolve()
+        try:
+            artifact_path.relative_to(resolved_run_directory)
+        except ValueError as error:
+            raise ValueError(
+                f"Artifact path for `{name}` leaves the run directory."
+            ) from error
+        if not artifact_path.is_file():
+            raise FileNotFoundError(artifact_path)
+
+        with np.load(artifact_path, allow_pickle=False) as archive:
+            return {
+                array_name: np.asarray(archive[array_name])
+                for array_name in archive.files
+            }
+
+    @staticmethod
+    def load_evaluation(
+        run_directory: str | Path,
+        name: str,
+    ) -> UncertaintyEvaluationResult:
+        """
+        Load a saved evaluation into its nested result dataclasses.
+
+        Parameters:
+        -----------
+        run_directory: str | Path
+            Directory created by `ExperimentRun`.
+        name: str
+            Semantic label originally passed to `save_evaluation()`.
+
+        Returns:
+        --------
+        UncertaintyEvaluationResult
+            Reconstructed uncertainty methods, errors, curves, and metrics.
+        """
+        arrays = ExperimentRun.load_arrays(
+            run_directory,
+            f"{name}_uncertainty",
+        )
+        stored_metrics = _read_json_object(
+            Path(run_directory).resolve() / "metrics.json"
+        )
+        metric_prefix = f"{name}/"
+        evaluation_metrics = {
+            metric_name.removeprefix(metric_prefix): value
+            for metric_name, value in stored_metrics.items()
+            if metric_name.startswith(metric_prefix)
+        }
+        return UncertaintyEvaluationResult.from_arrays(
+            arrays,
+            metrics=evaluation_metrics,
+        )
 
     def record_input(self, name: str, path: str | Path) -> None:
         """
@@ -213,7 +325,12 @@ class ExperimentRun:
             Saved NPZ artifact path.
         """
         _, artifact_directory = self._require_started()
-        artifact_path = artifact_directory / f"{name}.npz"
+        artifact_path = (
+            artifact_directory
+            / ARRAY_ARTIFACT_DIRECTORY
+            / f"{name}.npz"
+        )
+        artifact_path.parent.mkdir(parents=True, exist_ok=True)
         np.savez_compressed(artifact_path, **arrays)
         self._record_artifact(
             name,
@@ -251,7 +368,12 @@ class ExperimentRun:
             Saved PNG artifact path.
         """
         _, artifact_directory = self._require_started()
-        artifact_path = artifact_directory / f"{name}.png"
+        artifact_path = (
+            artifact_directory
+            / FIGURE_ARTIFACT_DIRECTORY
+            / f"{name}.png"
+        )
+        artifact_path.parent.mkdir(parents=True, exist_ok=True)
         figure.savefig(
             artifact_path,
             dpi=dpi,
@@ -298,6 +420,8 @@ class ExperimentRun:
             metadata={
                 "saved_model_reference": name,
                 "methods": evaluation.config.methods,
+                "schema": UNCERTAINTY_EVALUATION_SCHEMA,
+                "schema_version": UNCERTAINTY_EVALUATION_SCHEMA_VERSION,
             },
             **evaluation.arrays,
         )
@@ -481,3 +605,16 @@ def _git_output(repository_root: Path, *arguments: str) -> str | None:
     if completed.returncode != 0:
         return None
     return completed.stdout.strip()
+
+
+def _read_json_object(path: Path) -> dict[str, Any]:
+    """Read a JSON object from an experiment-run file."""
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        raise
+    except json.JSONDecodeError as error:
+        raise ValueError(f"Invalid JSON in experiment run file: {path}.") from error
+    if not isinstance(payload, dict):
+        raise ValueError(f"Experiment run file must contain an object: {path}.")
+    return payload
