@@ -23,9 +23,8 @@ def centered_fourier_crop(
     """
     Return a centered square crop of an orthonormal two-dimensional FFT.
 
-    This reproduces `fourier_forward` from `bayes_rays_fourier.ipynb`: the
-    zero-frequency coefficient is shifted to the image center before taking
-    the `crop_size` by `crop_size` region.
+    the zero-frequency coefficient is shifted to the image center before taking the `crop_size`
+    by `crop_size` region.
 
     Parameters:
     -----------
