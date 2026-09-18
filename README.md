@@ -1,17 +1,46 @@
-### Folders
+# Neural Inverse Imaging UQ
 
-**bh_emsenble/** - Naive ensemble test on black hole model. Stores the 100 models and their training logs.
+Research code for studying uncertainty in coordinate-based neural image reconstructions under CT, cropped Fourier, and VLBI forward models. We compare deformation-based BayesRays with parameter-space Laplace and deep ensembles, and use Fourier-domain diagnostics to separate model uncertainty from what the measurements constrain.
 
-**datasets/** - EHT data for black hole imaging 
+## Repository layout
 
-**inpainting/** - Test jax implementation on simple images
+```text
+.
+├── src/bhuq/
+│   ├── forward/          # CT / Fourier-crop / VLBI measurement models
+│   ├── models/           # coordinate-based neural image models
+│   ├── uq/               # deformation, Laplace, ensemble, and Fourier uncertainty quantification
+│   ├── visualization/    # maps, sparsification curves, and composed figures
+│   ├── model_training.py # common in-memory and saved-model workflow
+│   ├── evaluation.py     # UQ orchestration and validation metrics
+│   └── runs.py           # experiment artifacts and provenance
+├── scripts/              # model-training entry points
+├── experiments/          # uncertainty-evaluation entry points
+├── data/                 # source images and telescope arrays
+└── archive/              # original notebooks, checkpoints, and figures
+```
 
-### Files (in root directory)
+## Getting started
 
-**bayes_rays_blackhole.ipynb** - 2D test implementation of bayes rays on black hole imaging problem. 
+Install the pinned Python 3.12 environment with
+[uv](https://docs.astral.sh/uv/):
 
-**bayes_rays_holdout.ipynb** - 2D test implementation of bayes rays on the image of the black hole, holding out half of the pixels to verify it captures the uncertainty correctly.
+```bash
+uv sync
+```
 
-**black_hole_params.msgpack** - Saved model parameters for the black hole imaging problem (training takes a while, this is to save time when loading up a fresh notebook)
+For example, train a five-member 64 x 64 vlbi ensemble:
 
-**neural_image_example.ipynb** - Example implementation from Brandon Zhao. I plot the naive ensemble results + std map and calibration plot here. 
+```bash
+uv run python scripts/train_vlbi_model.py \
+  data/images/avery_sgra_eofn.txt \
+  --pixel-count 64 \
+  --seeds 0 1 2 3 4
+```
+
+To run uncertainty quantification methods on the saved model bundle using a sample experiment:
+
+```bash
+uv run python experiments/vlbi_image.py \
+  model_cache/vlbi/avery_sgra_eofn/eht2017/64x64/neural_image/<model-id>
+```

@@ -3,9 +3,9 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "bayesrays-2d-vlbi"
+name = "neural-inverse-imaging-uq"
 version = "0.1.0"
-description = "Research code for uncertainty quantification in neural VLBI imaging."
+description = "Uncertainty quantification for neural inverse imaging."
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [

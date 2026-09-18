@@ -22,8 +22,8 @@ def centered_fourier_crop(
 ) -> jax.Array:
     """
     Return a centered square crop of an orthonormal two-dimensional FFT.
-
-    the zero-frequency coefficient is shifted to the image center before taking the `crop_size`
+    
+    The zero-frequency coefficient is shifted to the image center before taking the `crop_size`
     by `crop_size` region.
 
     Parameters:
