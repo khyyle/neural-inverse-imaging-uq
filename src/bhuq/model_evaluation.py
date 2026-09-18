@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Any
 
@@ -18,6 +19,8 @@ from .evaluation import (
 from .forward import LinearInverseProblem
 from .model_cache import SavedModel
 from .model_training import TrainedModel
+
+LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -102,6 +105,11 @@ def evaluate_model(
     if not trained_model.members:
         raise ValueError("`trained_model` must contain at least one member.")
 
+    LOGGER.info(
+        "JAX backend: %s; devices: %s",
+        jax.default_backend(),
+        jax.devices(),
+    )
     parameters = trained_model.parameters
     member_images = np.stack(
         [

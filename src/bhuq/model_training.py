@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -23,6 +24,8 @@ from .training import (
     TrainingConfig,
     fit_ensemble,
 )
+
+LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -160,6 +163,11 @@ def train_model(
     if save and model_name is None:
         raise ValueError("`model_name` is required when `save=True`.")
 
+    LOGGER.info(
+        "JAX backend: %s; devices: %s",
+        jax.default_backend(),
+        jax.devices(),
+    )
     model_class = _qualified_model_class(model)
     training_started_at = datetime.now(UTC)
     start_time = time.monotonic()

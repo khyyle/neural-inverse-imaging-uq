@@ -39,7 +39,38 @@ EHT_2017_HIGH_BAND = VlbiBand(
 
 @dataclass(frozen=True)
 class VlbiProblemConfig:
-    """Store model-cache configuration shared by VLBI training and evaluation."""
+    """
+    Store model-cache configuration shared by VLBI training and evaluation.
+
+    Parameters:
+    -----------
+    source_image_path: Path
+        ehtim text image supplying brightness and source metadata.
+    telescope_array_path: Path
+        ehtim array file supplying station positions and sensitivities.
+    pixel_count: int
+        Number of pixels along each reconstruction-image axis.
+    bandwidth_hz: float
+        Effective bandwidth of the observation in hertz.
+    integration_time_seconds: float
+        Integration time for each visibility measurement.
+    scan_advance_seconds: float
+        Time between successive scans.
+    start_time_hours: float
+        Beginning of the observation in UTC hours.
+    stop_time_hours: float
+        End of the observation in UTC hours.
+    transform_type: str
+        Fourier-transform implementation passed to ehtim, one of `fast`,
+        `nfft`, or `direct`.
+    add_thermal_noise: bool
+        If `True`, draw thermal noise and calibration corruptions through
+        `observe_same`. If `False`, preserve noiseless visibilities while
+        retaining the array-derived noise standard deviations.
+    thermal_noise_seed: int
+        Positive ehtim seed used when thermal noise is enabled.
+    """
+
     source_image_path: Path
     telescope_array_path: Path
     pixel_count: int
@@ -90,7 +121,7 @@ def simulate_observation(
         Telescope coordinates and sensitivity values used to generate
         baselines and thermal-noise standard deviations.
     bandwidth_hz: float
-        Effective bandwidth of the observation.
+        Effective bandwidth of the observation in hertz.
     integration_time_seconds: float
         Integration time for each visibility measurement.
     scan_advance_seconds: float
@@ -100,13 +131,14 @@ def simulate_observation(
     stop_time_hours: float
         End of the observation in UTC hours.
     transform_type: str
-        Fourier-transform implementation passed to ehtim, one of ['fast', 'nfft', 'direct']
+        Fourier-transform implementation passed to ehtim, one of `fast`,
+        `nfft`, or `direct`.
     add_thermal_noise: bool
         If `True`, draw thermal noise and calibration corruptions through
         `observe_same`. If `False`, preserve noiseless visibilities while
         retaining the array-derived noise standard deviations.
     thermal_noise_seed: int
-        ehtim random seed used when thermal noise is enabled.
+        Positive ehtim seed used when thermal noise is enabled.
 
     Returns:
     --------
@@ -117,7 +149,8 @@ def simulate_observation(
     Raises:
     -------
     ValueError
-        If `bandwidth_hz` is not positive.
+        If `bandwidth_hz` is not positive, or if thermal noise is enabled with
+        a non-positive seed.
     """
     if bandwidth_hz <= 0.0:
         raise ValueError("`bandwidth_hz` must be positive.")

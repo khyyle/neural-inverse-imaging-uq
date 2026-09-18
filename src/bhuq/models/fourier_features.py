@@ -23,7 +23,22 @@ type ParameterTree = Any
 
 @dataclass(frozen=True)
 class FourierFeatureModelConfig:
-    """Store the model-cache recipe shared by CT training and evaluation."""
+    """
+    Store the model-cache recipe shared by CT training and evaluation.
+
+    Parameters:
+    -----------
+    number_of_frequencies: int
+        Number of Gaussian frequency vectors in the coordinate encoding.
+    frequency_scale: float
+        Standard deviation used to sample frequency-vector entries.
+    frequency_seed: int
+        Random seed used to reproduce the fixed frequency matrix.
+    network_depth: int
+        Total number of dense layers, including the output layer.
+    network_width: int
+        Number of outputs in each hidden layer.
+    """
 
     number_of_frequencies: int
     frequency_scale: float

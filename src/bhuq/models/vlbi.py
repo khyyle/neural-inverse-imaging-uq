@@ -22,7 +22,20 @@ DEFAULT_OUTPUT_LOGIT_OFFSET = 10.0
 
 @dataclass(frozen=True)
 class NeuralImageConfig:
-    """Store the model-cache recipe shared by VLBI training and evaluation."""
+    """
+    Store the model-cache recipe shared by VLBI training and evaluation.
+
+    Parameters:
+    -----------
+    positional_encoding_degree: int
+        Number of positional-encoding frequency levels.
+    network_depth: int
+        Number of hidden MLP layers.
+    network_width: int
+        Number of outputs in each hidden layer.
+    output_logit_offset: float
+        Value subtracted before the output sigmoid to initialize a dark image.
+    """
 
     positional_encoding_degree: int
     network_depth: int

@@ -21,8 +21,27 @@ SUPPORTED_INTERPOLATION_ORDERS: tuple[InterpolationOrder, ...] = (0, 1)
 
 @dataclass(frozen=True)
 class RadonProblemConfig:
-    """Store model-cache configuration shared by CT training and evaluation."""
+    """
+    Store model-cache configuration shared by CT training and evaluation.
+
+    Parameters:
+    -----------
     source_image_path: Path
+        Scalar source image used to generate synthetic CT projections.
+    source_array_key: str | None
+        Lookup key for an NPZ source. Required for multi-array archives.
+    pixel_count: int
+        Number of pixels along each square reconstruction-image axis.
+    number_of_projection_angles: int
+        Uniform projection angles sampled over `[0, pi)`.
+    interpolation_order: InterpolationOrder
+        Zero for nearest-neighbor rotation or one for bilinear rotation.
+    noise_standard_deviation: float
+        Standard deviation assigned to every projection measurement.
+    """
+
+    source_image_path: Path
+    source_array_key: str | None
     pixel_count: int
     number_of_projection_angles: int
     interpolation_order: InterpolationOrder
