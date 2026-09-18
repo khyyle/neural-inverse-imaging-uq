@@ -13,7 +13,7 @@ from jax.scipy import ndimage as jax_ndimage
 from jax.typing import ArrayLike
 from skimage.transform import resize_local_mean
 
-from ..image_loading import load_scalar_image
+from ..image_loading import load_scalar_image, normalize_image_by_maximum
 from .linear_problem import LinearInverseProblem
 
 type InterpolationOrder = Literal[0, 1]
@@ -477,10 +477,7 @@ def build_radon_problem_from_config(
         grid_mode=True,
         preserve_range=True,
     )
-    maximum_intensity = float(resized_image.max())
-    if maximum_intensity <= 0.0:
-        raise ValueError("The resized source image must have positive intensity.")
-    truth = resized_image / maximum_intensity
+    truth = normalize_image_by_maximum(resized_image)
     projection_angles = np.linspace(
         0.0,
         np.pi,

@@ -31,7 +31,7 @@ MODEL_CONFIG = NeuralImageConfig(
     positional_encoding_degree=3,
     network_depth=4,
     network_width=128,
-    output_logit_offset=10.0,
+    output_logit_offset=0.0,
 )
 TRAINING_CONFIG = TrainingConfig(
     number_of_steps=10_000,
@@ -74,7 +74,7 @@ def parse_arguments() -> argparse.Namespace:
         "--noise-standard-deviation",
         type=float,
         default=NOISE_STANDARD_DEVIATION,
-        help="Per-component standard deviation assigned to each coefficient.",
+        help="Per-component coefficient noise after image normalization.",
     )
     parser.add_argument(
         "--cache-root",

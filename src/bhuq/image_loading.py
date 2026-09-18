@@ -105,6 +105,29 @@ def load_scalar_image(
     return image
 
 
+def normalize_image_by_maximum(image: np.ndarray) -> np.ndarray:
+    """
+    Scale a finite scalar image so its maximum intensity is one.
+
+    Parameters:
+    -----------
+    image: np.ndarray
+        Non-empty image with a positive maximum intensity.
+
+    Returns:
+    --------
+    np.ndarray
+        Floating-point image divided by its maximum.
+    """
+    image_array = np.asarray(image, dtype=np.float32)
+    if image_array.size == 0 or not np.all(np.isfinite(image_array)):
+        raise ValueError("`image` must contain finite values.")
+    maximum_intensity = float(image_array.max())
+    if maximum_intensity <= 0.0:
+        raise ValueError("`image` must have a positive maximum intensity.")
+    return image_array / maximum_intensity
+
+
 def _load_npz_image(
     path: Path,
     *,

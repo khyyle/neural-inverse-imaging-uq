@@ -12,7 +12,7 @@ import numpy as np
 from jax.typing import ArrayLike
 from skimage.transform import resize_local_mean
 
-from ..image_loading import load_scalar_image
+from ..image_loading import load_scalar_image, normalize_image_by_maximum
 from .linear_problem import LinearInverseProblem
 
 
@@ -76,7 +76,7 @@ class FourierCropProblemConfig:
         Width and height of the centered Fourier region.
     noise_standard_deviation: float
         Assumed standard deviation of each complex coefficient's independent
-        real and imaginary components.
+        real and imaginary components after image normalization.
     """
 
     source_image_path: Path
@@ -253,8 +253,8 @@ def build_fourier_crop_problem_from_config(
     """
     Rebuild a Fourier-crop problem and truth image from its saved recipe.
 
-    The source intensity scale is preserved, matching the Fourier notebook.
-    Only spatial resizing is applied before generating noiseless observations.
+    The resized source is normalized by its maximum before generating
+    noiseless observations, matching the bounded neural-image output.
 
     Parameters:
     -----------
@@ -266,17 +266,19 @@ def build_fourier_crop_problem_from_config(
     problem: LinearInverseProblem
         Synthetic centered Fourier-crop measurements and noise model.
     truth: np.ndarray
-        Source image resized to the configured square resolution.
+        Resized source image with maximum intensity one.
     """
     source_image = load_scalar_image(
         config.source_image_path,
         array_key=config.source_array_key,
     )
-    truth = resize_local_mean(
-        source_image,
-        (config.pixel_count, config.pixel_count),
-        grid_mode=True,
-        preserve_range=True,
+    truth = normalize_image_by_maximum(
+        resize_local_mean(
+            source_image,
+            (config.pixel_count, config.pixel_count),
+            grid_mode=True,
+            preserve_range=True,
+        )
     )
     problem = build_fourier_crop_inverse_problem(
         truth,
