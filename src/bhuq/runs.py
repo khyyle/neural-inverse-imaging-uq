@@ -260,6 +260,73 @@ class ExperimentRun:
             metrics=evaluation_metrics,
         )
 
+    @staticmethod
+    def add_figure(
+        run_directory: str | Path,
+        name: str,
+        figure: Any,
+        *,
+        metadata: dict[str, Any] | None = None,
+        dpi: int = 115,
+    ) -> Path:
+        """
+        Add a new figure artifact to an existing experiment run.
+
+        Parameters:
+        -----------
+        run_directory: str | Path
+            Directory created by `ExperimentRun`.
+        name: str
+            Unique semantic figure name without an extension.
+        figure: Any
+            Matplotlib-compatible object exposing `savefig`.
+        metadata: dict[str, Any] | None
+            Optional description of the figure.
+        dpi: int
+            PNG resolution.
+
+        Returns:
+        --------
+        Path
+            Saved PNG artifact path.
+
+        Raises:
+        -------
+        FileNotFoundError
+            If the run directory or artifact manifest does not exist.
+        ValueError
+            If the artifact name is already registered.
+        """
+        resolved_run_directory = Path(run_directory).resolve()
+        if not resolved_run_directory.is_dir():
+            raise FileNotFoundError(resolved_run_directory)
+
+        manifest_path = resolved_run_directory / "artifacts.json"
+        artifacts = _read_json_object(manifest_path)
+        if name in artifacts:
+            raise ValueError(f"Experiment artifact already exists: {name}.")
+
+        figure_path = (
+            resolved_run_directory
+            / "artifacts"
+            / FIGURE_ARTIFACT_DIRECTORY
+            / f"{name}.png"
+        )
+        figure_path.parent.mkdir(parents=True, exist_ok=True)
+        figure.savefig(
+            figure_path,
+            dpi=dpi,
+            bbox_inches="tight",
+        )
+        artifacts[name] = {
+            "kind": "figure",
+            "path": str(figure_path.relative_to(resolved_run_directory)),
+            "sha256": describe_file(figure_path)["sha256"],
+            "metadata": json_value(metadata or {}),
+        }
+        _write_json_object(manifest_path, artifacts)
+        return figure_path
+
     def record_input(self, name: str, path: str | Path) -> None:
         """
         Record an input path, size, and digest.
@@ -569,15 +636,7 @@ class ExperimentRun:
     def _write_json(self, name: str, payload: Any) -> None:
         """Write JSON inside the active run directory."""
         run_directory, _ = self._require_started()
-        (run_directory / name).write_text(
-            json.dumps(
-                json_value(payload),
-                indent=2,
-                sort_keys=True,
-            )
-            + "\n",
-            encoding="utf-8",
-        )
+        _write_json_object(run_directory / name, payload)
 
     def _require_started(self) -> tuple[Path, Path]:
         """Return active directories or fail before any output operation."""
@@ -618,3 +677,16 @@ def _read_json_object(path: Path) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise ValueError(f"Experiment run file must contain an object: {path}.")
     return payload
+
+
+def _write_json_object(path: Path, payload: Any) -> None:
+    """Write a JSON object with stable formatting."""
+    path.write_text(
+        json.dumps(
+            json_value(payload),
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
