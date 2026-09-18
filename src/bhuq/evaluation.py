@@ -75,6 +75,8 @@ class UncertaintyEvaluationConfig:
         Number of Lanczos eigenpairs retained for full-network Laplace.
     laplace_random_seed: int
         Seed used to initialize Lanczos.
+    laplace_map_chunk_size: int
+        Image coordinates propagated through parameter uncertainty together.
     methods: tuple[UncertaintyMethod, ...]
         UQ methods evaluated together. Individual method functions remain
         independently callable.
@@ -92,6 +94,7 @@ class UncertaintyEvaluationConfig:
     laplace_curvature: LaplaceCurvature = "lanczos"
     laplace_rank: int = 50
     laplace_random_seed: int = 0
+    laplace_map_chunk_size: int = 4_096
     methods: tuple[UncertaintyMethod, ...] = SUPPORTED_UNCERTAINTY_METHODS
 
     def __post_init__(self) -> None:
@@ -111,6 +114,8 @@ class UncertaintyEvaluationConfig:
             )
         if self.laplace_rank <= 0:
             raise ValueError("`laplace_rank` must be positive.")
+        if self.laplace_map_chunk_size <= 0:
+            raise ValueError("`laplace_map_chunk_size` must be positive.")
 
 
 @dataclass(frozen=True)
@@ -557,6 +562,7 @@ def compute_uncertainty_results(
             curvature=config.laplace_curvature,
             rank=config.laplace_rank,
             random_seed=config.laplace_random_seed,
+            map_chunk_size=config.laplace_map_chunk_size,
         )
 
     if "ensemble" in selected_methods:

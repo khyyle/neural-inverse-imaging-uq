@@ -64,6 +64,7 @@ def linearized_parameter_laplace(
     curvature: LaplaceCurvature = "lanczos",
     rank: int = 50,
     random_seed: int = 0,
+    map_chunk_size: int = 4_096,
     dense_memory_warning_bytes: int = DEFAULT_DENSE_MEMORY_WARNING_BYTES,
 ) -> LinearizedLaplaceResult:
     """
@@ -93,6 +94,8 @@ def linearized_parameter_laplace(
         Number of retained Lanczos eigenpairs.
     random_seed: int
         Seed used to initialize the Lanczos iteration.
+    map_chunk_size: int
+        Image coordinates propagated through the posterior together.
     dense_memory_warning_bytes: int
         Estimated dense-curvature working memory that emits a warning.
 
@@ -112,6 +115,8 @@ def linearized_parameter_laplace(
         raise ValueError("`curvature` must be `full` or `lanczos`.")
     if dense_memory_warning_bytes <= 0:
         raise ValueError("`dense_memory_warning_bytes` must be positive.")
+    if map_chunk_size <= 0:
+        raise ValueError("`map_chunk_size` must be positive.")
 
     coordinate_array = jnp.asarray(coordinates, dtype=jnp.float32)
     if coordinate_array.ndim != 2:
@@ -218,11 +223,19 @@ def linearized_parameter_laplace(
         prior_arguments={"prior_prec": prior_precision},
         pushforward_fns=[lin_setup, lin_pred_mean, lin_pred_var],
     )
-    predictive_values = jax.vmap(predict_at_coordinate)(coordinate_array)
-    pixel_variance = np.asarray(
-        predictive_values["pred_var"],
-        dtype=np.float32,
-    ).reshape(-1)
+    variance_chunks = []
+    for start in range(0, coordinate_array.shape[0], map_chunk_size):
+        stop = min(start + map_chunk_size, coordinate_array.shape[0])
+        predictive_values = jax.vmap(predict_at_coordinate)(
+            coordinate_array[start:stop]
+        )
+        variance_chunks.append(
+            np.asarray(
+                predictive_values["pred_var"],
+                dtype=np.float32,
+            ).reshape(-1)
+        )
+    pixel_variance = np.concatenate(variance_chunks)
     if not np.all(np.isfinite(pixel_variance)):
         raise FloatingPointError(
             "Laplax produced non-finite pixel variances."
