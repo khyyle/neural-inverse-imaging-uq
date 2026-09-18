@@ -36,8 +36,8 @@ MODEL_CONFIG = NeuralImageConfig(
 TRAINING_CONFIG = TrainingConfig(
     number_of_steps=10_000,
     initial_learning_rate=1e-3,
-    final_learning_rate=1e-3,
-    learning_rate_schedule="constant",
+    final_learning_rate=1e-5,
+    learning_rate_schedule="cosine",
     batch_size=None,
     log_interval=100,
 )
