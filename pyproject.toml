@@ -28,6 +28,9 @@ image-examples = [
     "imageio==2.37.4",
     "pillow==12.3.0",
 ]
+modal = [
+    "modal==1.5.5",
+]
 
 [dependency-groups]
 dev = [
