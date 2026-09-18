@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -36,6 +37,34 @@ EHT_2017_HIGH_BAND = VlbiBand(
 )
 
 
+@dataclass(frozen=True)
+class VlbiProblemConfig:
+    """Store model-cache configuration shared by VLBI training and evaluation."""
+    source_image_path: Path
+    telescope_array_path: Path
+    pixel_count: int
+    bandwidth_hz: float
+    integration_time_seconds: float
+    scan_advance_seconds: float
+    start_time_hours: float
+    stop_time_hours: float
+    transform_type: str
+    add_thermal_noise: bool
+    thermal_noise_seed: int
+
+    @classmethod
+    def from_dict(cls, values: dict[str, Any]) -> VlbiProblemConfig:
+        """Restore typed problem configuration from saved JSON metadata."""
+        restored_values = dict(values)
+        restored_values["source_image_path"] = Path(
+            restored_values["source_image_path"]
+        )
+        restored_values["telescope_array_path"] = Path(
+            restored_values["telescope_array_path"]
+        )
+        return cls(**restored_values)
+
+
 def simulate_observation(
     source_image: Any,
     telescope_array: Any,
@@ -47,6 +76,7 @@ def simulate_observation(
     stop_time_hours: float = 24.0,
     transform_type: str = "nfft",
     add_thermal_noise: bool = False,
+    thermal_noise_seed: int = 1,
 ) -> Any:
     """
     Sample an ehtim image with an ehtim telescope array.
@@ -75,6 +105,8 @@ def simulate_observation(
         If `True`, draw thermal noise and calibration corruptions through
         `observe_same`. If `False`, preserve noiseless visibilities while
         retaining the array-derived noise standard deviations.
+    thermal_noise_seed: int
+        ehtim random seed used when thermal noise is enabled.
 
     Returns:
     --------
@@ -89,6 +121,10 @@ def simulate_observation(
     """
     if bandwidth_hz <= 0.0:
         raise ValueError("`bandwidth_hz` must be positive.")
+    if add_thermal_noise and thermal_noise_seed <= 0:
+        raise ValueError(
+            "`thermal_noise_seed` must be positive when noise is enabled."
+        )
 
     observation_schedule = telescope_array.obsdata(
         tint=integration_time_seconds,
@@ -105,7 +141,11 @@ def simulate_observation(
     )
 
     if add_thermal_noise:
-        return source_image.observe_same(observation_schedule, ttype=transform_type)
+        return source_image.observe_same(
+            observation_schedule,
+            ttype=transform_type,
+            seed=thermal_noise_seed,
+        )
     return source_image.observe_same_nonoise(observation_schedule, ttype=transform_type)
 
 

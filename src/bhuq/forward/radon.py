@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal
+from pathlib import Path
+from typing import Any, Literal
 
 import jax
 import jax.numpy as jnp
@@ -16,6 +17,25 @@ from .linear_problem import LinearInverseProblem
 type InterpolationOrder = Literal[0, 1]
 
 SUPPORTED_INTERPOLATION_ORDERS: tuple[InterpolationOrder, ...] = (0, 1)
+
+
+@dataclass(frozen=True)
+class RadonProblemConfig:
+    """Store model-cache configuration shared by CT training and evaluation."""
+    source_image_path: Path
+    pixel_count: int
+    number_of_projection_angles: int
+    interpolation_order: InterpolationOrder
+    noise_standard_deviation: float
+
+    @classmethod
+    def from_dict(cls, values: dict[str, Any]) -> RadonProblemConfig:
+        """Restore typed problem configuration from saved JSON metadata."""
+        restored_values = dict(values)
+        restored_values["source_image_path"] = Path(
+            restored_values["source_image_path"]
+        )
+        return cls(**restored_values)
 
 
 def _rotated_sample_coordinates(

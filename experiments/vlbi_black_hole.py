@@ -2,7 +2,7 @@
 
 import argparse
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 import ehtim as eh
@@ -10,6 +10,7 @@ import numpy as np
 
 from bhuq.evaluation import UncertaintyEvaluationConfig
 from bhuq.forward import (
+    VlbiProblemConfig,
     build_vlbi_inverse_problem,
     simulate_observation,
 )
@@ -21,25 +22,23 @@ from bhuq.model_evaluation import (
 from bhuq.model_training import load_model
 from bhuq.models import (
     NeuralImage,
+    NeuralImageConfig,
     build_vlbi_coordinate_grid,
 )
 from bhuq.runs import ExperimentRun
 
 LOGGER = logging.getLogger(__name__)
 
-
-def _default_uncertainty_config() -> UncertaintyEvaluationConfig:
-    """Return the UQ methods compared by this experiment."""
-    return UncertaintyEvaluationConfig(
-        deformation_grid_size=64,
-        deformation_prior_scale=1e-4,
-        methods=(
-            "deformation",
-            "parameter_laplace",
-            "ensemble",
-            "fourier_data_blind",
-        ),
-    )
+DEFAULT_UNCERTAINTY_CONFIG = UncertaintyEvaluationConfig(
+    deformation_grid_size=64,
+    deformation_prior_scale=1e-4,
+    methods=(
+        "deformation",
+        "parameter_laplace",
+        "ensemble",
+        "fourier_data_blind",
+    ),
+)
 
 
 @dataclass(frozen=True)
@@ -47,46 +46,52 @@ class ExperimentConfig:
     """Configuration unique to this UQ result."""
 
     saved_model_path: Path
-    uncertainty: UncertaintyEvaluationConfig = field(
-        default_factory=_default_uncertainty_config
-    )
+    uncertainty: UncertaintyEvaluationConfig = DEFAULT_UNCERTAINTY_CONFIG
     results_root: Path = Path("results")
 
 
 def evaluate(config: ExperimentConfig) -> ModelEvaluationResult:
-    """Reconstruct the VLBI scenario and evaluate its cached ensemble."""
+    """Reconstruct a VLBI scenario and evaluate its cached ensemble."""
     saved_model = open_saved_model(config.saved_model_path)
-    problem_metadata = saved_model.problem_metadata
-    model_metadata = saved_model.model_metadata
+    problem_config = VlbiProblemConfig.from_dict(
+        saved_model.problem_metadata
+    )
+    model_config = NeuralImageConfig.from_dict(saved_model.model_metadata)
 
-    source_image_path = Path(problem_metadata["source_image_path"])
-    telescope_array_path = Path(problem_metadata["telescope_array_path"])
+    source_image_path = problem_config.source_image_path
+    telescope_array_path = problem_config.telescope_array_path
     source = eh.image.load_txt(str(source_image_path))
     telescope_array = eh.array.load_txt(str(telescope_array_path))
     observation = simulate_observation(
         source,
         telescope_array,
-        bandwidth_hz=problem_metadata["bandwidth_hz"],
-        integration_time_seconds=(
-            problem_metadata["integration_time_seconds"]
-        ),
-        scan_advance_seconds=problem_metadata["scan_advance_seconds"],
-        start_time_hours=problem_metadata["start_time_hours"],
-        stop_time_hours=problem_metadata["stop_time_hours"],
-        transform_type=problem_metadata["transform_type"],
-        add_thermal_noise=problem_metadata["add_thermal_noise"],
+        bandwidth_hz=problem_config.bandwidth_hz,
+        integration_time_seconds=problem_config.integration_time_seconds,
+        scan_advance_seconds=problem_config.scan_advance_seconds,
+        start_time_hours=problem_config.start_time_hours,
+        stop_time_hours=problem_config.stop_time_hours,
+        transform_type=problem_config.transform_type,
+        add_thermal_noise=problem_config.add_thermal_noise,
+        thermal_noise_seed=problem_config.thermal_noise_seed,
     )
     problem = build_vlbi_inverse_problem(
         observation,
-        pixel_count=problem_metadata["pixel_count"],
+        pixel_count=problem_config.pixel_count,
         field_of_view_radians=source.fovx(),
     )
     coordinates = build_vlbi_coordinate_grid(problem.image_shape)
-    model = NeuralImage(**model_metadata)
+    model = NeuralImage(
+        positional_encoding_degree=(
+            model_config.positional_encoding_degree
+        ),
+        network_depth=model_config.network_depth,
+        network_width=model_config.network_width,
+        output_logit_offset=model_config.output_logit_offset,
+    )
     truth = np.asarray(
         source.regrid_image(
             source.fovx(),
-            problem_metadata["pixel_count"],
+            problem_config.pixel_count,
         ).imarr()
     )
 

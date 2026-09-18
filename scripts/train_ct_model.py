@@ -1,7 +1,6 @@
 """Train and cache a CT Sgr A* Fourier-feature ensemble."""
 
 import logging
-from dataclasses import dataclass
 from pathlib import Path
 
 import ehtim as eh
@@ -9,10 +8,11 @@ import jax
 import numpy as np
 from skimage.transform import resize_local_mean
 
-from bhuq.forward import build_radon_inverse_problem
+from bhuq.forward import RadonProblemConfig, build_radon_inverse_problem
 from bhuq.model_training import train_model
 from bhuq.models import (
     FourierFeatureMLP,
+    FourierFeatureModelConfig,
     build_fourier_feature_coordinate_grid,
     sample_gaussian_frequencies,
 )
@@ -32,26 +32,20 @@ def _default_training_config() -> TrainingConfig:
     )
 
 
-@dataclass(frozen=True)
-class ProblemConfig:
-    source_image_path: Path = Path("data/images/avery_sgra_eofn.txt")
-    pixel_count: int = 128
-    number_of_projection_angles: int = 40
-    interpolation_order: int = 0
-    noise_standard_deviation: float = 1.0
-
-
-@dataclass(frozen=True)
-class ModelConfig:
-    number_of_frequencies: int = 256
-    frequency_scale: float = 4.0
-    frequency_seed: int = 10
-    network_depth: int = 4
-    network_width: int = 256
-
-
-PROBLEM = ProblemConfig()
-MODEL = ModelConfig()
+PROBLEM = RadonProblemConfig(
+    source_image_path=Path("data/images/avery_sgra_eofn.txt"),
+    pixel_count=128,
+    number_of_projection_angles=40,
+    interpolation_order=0,
+    noise_standard_deviation=1.0,
+)
+MODEL = FourierFeatureModelConfig(
+    number_of_frequencies=256,
+    frequency_scale=4.0,
+    frequency_seed=10,
+    network_depth=4,
+    network_width=256,
+)
 TRAINING = _default_training_config()
 SEEDS = tuple(range(5))
 MODEL_NAME = "ct/sgr-a/128x128/fourier_feature_mlp"

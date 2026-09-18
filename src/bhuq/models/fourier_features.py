@@ -10,6 +10,7 @@ initializer arguments. The network here is implemented using flax.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any
 
 import jax
@@ -18,6 +19,22 @@ import numpy as np
 from flax import linen as nn
 
 type ParameterTree = Any
+
+
+@dataclass(frozen=True)
+class FourierFeatureModelConfig:
+    """Store the model-cache recipe shared by CT training and evaluation."""
+
+    number_of_frequencies: int
+    frequency_scale: float
+    frequency_seed: int
+    network_depth: int
+    network_width: int
+
+    @classmethod
+    def from_dict(cls, values: dict[str, Any]) -> FourierFeatureModelConfig:
+        """Restore typed model configuration from saved JSON metadata."""
+        return cls(**values)
 
 
 def fourier_features(

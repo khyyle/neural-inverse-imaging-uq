@@ -2,7 +2,7 @@
 
 import argparse
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 import ehtim as eh
@@ -11,7 +11,7 @@ import numpy as np
 from skimage.transform import resize_local_mean
 
 from bhuq.evaluation import UncertaintyEvaluationConfig
-from bhuq.forward import build_radon_inverse_problem
+from bhuq.forward import RadonProblemConfig, build_radon_inverse_problem
 from bhuq.model_cache import open_saved_model
 from bhuq.model_evaluation import (
     ModelEvaluationResult,
@@ -20,6 +20,7 @@ from bhuq.model_evaluation import (
 from bhuq.model_training import load_model
 from bhuq.models import (
     FourierFeatureMLP,
+    FourierFeatureModelConfig,
     build_fourier_feature_coordinate_grid,
     sample_gaussian_frequencies,
 )
@@ -27,34 +28,34 @@ from bhuq.runs import ExperimentRun
 
 LOGGER = logging.getLogger(__name__)
 
-
-def _default_uncertainty_config() -> UncertaintyEvaluationConfig:
-    return UncertaintyEvaluationConfig(
-        deformation_grid_size=64,
-        deformation_prior_scale=1e-8,
-        methods=("deformation", "parameter_laplace", "ensemble"),
-    )
+DEFAULT_UNCERTAINTY_CONFIG = UncertaintyEvaluationConfig(
+    deformation_grid_size=64,
+    deformation_prior_scale=1e-8,
+    methods=("deformation", "parameter_laplace", "ensemble"),
+)
 
 
 @dataclass(frozen=True)
 class ExperimentConfig:
     saved_model_path: Path
-    uncertainty: UncertaintyEvaluationConfig = field(
-        default_factory=_default_uncertainty_config
-    )
+    uncertainty: UncertaintyEvaluationConfig = DEFAULT_UNCERTAINTY_CONFIG
     results_root: Path = Path("results")
 
 
 def evaluate(config: ExperimentConfig) -> ModelEvaluationResult:
-    """Reconstruct the CT scenario and evaluate its cached ensemble."""
+    """Reconstruct a CT scenario and evaluate its cached ensemble."""
     saved_model = open_saved_model(config.saved_model_path)
-    problem_metadata = saved_model.problem_metadata
-    model_metadata = saved_model.model_metadata
+    problem_config = RadonProblemConfig.from_dict(
+        saved_model.problem_metadata
+    )
+    model_config = FourierFeatureModelConfig.from_dict(
+        saved_model.model_metadata
+    )
 
-    source_image_path = Path(problem_metadata["source_image_path"])
+    source_image_path = problem_config.source_image_path
     source = eh.image.load_txt(str(source_image_path))
     source_image = np.asarray(source.imarr(), dtype=np.float32)
-    pixel_count = problem_metadata["pixel_count"]
+    pixel_count = problem_config.pixel_count
     resized_image = resize_local_mean(
         source_image,
         (pixel_count, pixel_count),
@@ -65,28 +66,26 @@ def evaluate(config: ExperimentConfig) -> ModelEvaluationResult:
     angles = np.linspace(
         0.0,
         np.pi,
-        problem_metadata["number_of_projection_angles"],
+        problem_config.number_of_projection_angles,
         endpoint=False,
         dtype=np.float32,
     )
     problem = build_radon_inverse_problem(
         truth,
         angles,
-        noise_standard_deviation=(
-            problem_metadata["noise_standard_deviation"]
-        ),
-        interpolation_order=problem_metadata["interpolation_order"],
+        noise_standard_deviation=problem_config.noise_standard_deviation,
+        interpolation_order=problem_config.interpolation_order,
     )
     coordinates = build_fourier_feature_coordinate_grid(problem.image_shape)
     frequencies = sample_gaussian_frequencies(
-        jax.random.PRNGKey(model_metadata["frequency_seed"]),
-        number_of_frequencies=model_metadata["number_of_frequencies"],
-        scale=model_metadata["frequency_scale"],
+        jax.random.PRNGKey(model_config.frequency_seed),
+        number_of_frequencies=model_config.number_of_frequencies,
+        scale=model_config.frequency_scale,
     )
     model = FourierFeatureMLP(
         frequency_matrix=frequencies,
-        network_depth=model_metadata["network_depth"],
-        network_width=model_metadata["network_width"],
+        network_depth=model_config.network_depth,
+        network_width=model_config.network_width,
     )
 
     input_paths = {"source_image": source_image_path}

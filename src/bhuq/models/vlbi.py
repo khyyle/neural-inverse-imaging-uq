@@ -5,6 +5,7 @@ from __future__ import annotations
 import functools
 import math
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any
 
 import jax
@@ -17,6 +18,21 @@ type ActivationFunction = Callable[[jax.Array], jax.Array]
 
 SINE_WRAP_PERIOD = 100.0 * math.pi
 DEFAULT_OUTPUT_LOGIT_OFFSET = 10.0
+
+
+@dataclass(frozen=True)
+class NeuralImageConfig:
+    """Store the model-cache recipe shared by VLBI training and evaluation."""
+
+    positional_encoding_degree: int
+    network_depth: int
+    network_width: int
+    output_logit_offset: float
+
+    @classmethod
+    def from_dict(cls, values: dict[str, Any]) -> NeuralImageConfig:
+        """Restore typed model configuration from saved JSON metadata."""
+        return cls(**values)
 
 
 def _safe_sin(values: jax.Array) -> jax.Array:
