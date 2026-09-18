@@ -5,16 +5,10 @@ import logging
 from dataclasses import dataclass
 from pathlib import Path
 
-import ehtim as eh
 import matplotlib.pyplot as plt
-import numpy as np
 
 from bhuq.evaluation import UncertaintyEvaluationConfig
-from bhuq.forward import (
-    VlbiProblemConfig,
-    build_vlbi_inverse_problem,
-    simulate_observation,
-)
+from bhuq.forward import VlbiProblemConfig, build_vlbi_problem_from_config
 from bhuq.image_loading import derive_image_name
 from bhuq.model_cache import open_saved_model
 from bhuq.model_evaluation import (
@@ -22,11 +16,7 @@ from bhuq.model_evaluation import (
     evaluate_model,
 )
 from bhuq.model_training import load_model
-from bhuq.models import (
-    NeuralImage,
-    NeuralImageConfig,
-    build_vlbi_coordinate_grid,
-)
+from bhuq.models import NeuralImageConfig, build_neural_image
 from bhuq.runs import ExperimentRun
 from bhuq.visualization import (
     make_fourier_figure,
@@ -75,57 +65,11 @@ def evaluate(config: ExperimentConfig) -> ModelEvaluationResult:
     problem_config = VlbiProblemConfig.from_dict(saved_model.problem_metadata)
     model_config = NeuralImageConfig.from_dict(saved_model.model_metadata)
 
-    source_image_path = problem_config.source_image_path
-    telescope_array_path = problem_config.telescope_array_path
-    source = eh.image.load_txt(str(source_image_path))
-    telescope_array = eh.array.load_txt(str(telescope_array_path))
-    observation = simulate_observation(
-        source,
-        telescope_array,
-        bandwidth_hz=problem_config.bandwidth_hz,
-        integration_time_seconds=problem_config.integration_time_seconds,
-        scan_advance_seconds=problem_config.scan_advance_seconds,
-        start_time_hours=problem_config.start_time_hours,
-        stop_time_hours=problem_config.stop_time_hours,
-        transform_type=problem_config.transform_type,
-        add_thermal_noise=problem_config.add_thermal_noise,
-        thermal_noise_seed=problem_config.thermal_noise_seed,
-    )
-    problem = build_vlbi_inverse_problem(
-        observation,
-        pixel_count=problem_config.pixel_count,
-        field_of_view_radians=source.fovx(),
-    )
-    coordinates = build_vlbi_coordinate_grid(problem.image_shape)
-    model = NeuralImage(
-        positional_encoding_degree=(
-            model_config.positional_encoding_degree
-        ),
-        network_depth=model_config.network_depth,
-        network_width=model_config.network_width,
-        output_logit_offset=model_config.output_logit_offset,
-    )
-    truth = np.asarray(
-        source.regrid_image(
-            source.fovx(),
-            problem_config.pixel_count,
-        ).imarr()
-    )
-
-    input_paths = {
-        "source_image": source_image_path,
-        "telescope_array": telescope_array_path,
-    }
-    trained_model = load_model(
-        saved_model,
-        model,
-        coordinates,
-        input_paths=input_paths,
-    )
+    problem, truth = build_vlbi_problem_from_config(problem_config)
+    model = build_neural_image(model_config)
+    trained_model = load_model(saved_model, model)
     return evaluate_model(
         trained_model,
-        model,
-        coordinates,
         problem,
         truth,
         config.uncertainty,

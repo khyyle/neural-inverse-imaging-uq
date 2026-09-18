@@ -8,7 +8,6 @@ from typing import Any
 
 import jax
 import numpy as np
-from flax import linen as nn
 
 from .evaluation import (
     UncertaintyEvaluationConfig,
@@ -52,8 +51,6 @@ class ModelEvaluationResult:
 
 def evaluate_model(
     trained_model: TrainedModel,
-    model: nn.Module,
-    coordinates: jax.Array,
     problem: LinearInverseProblem,
     truth: np.ndarray,
     config: UncertaintyEvaluationConfig,
@@ -68,10 +65,6 @@ def evaluate_model(
     -----------
     trained_model: TrainedModel
         Fitted parameter trees and optional saved identity.
-    model: nn.Module
-        Caller-constructed Flax model matching `trained_model`.
-    coordinates: jax.Array
-        Coordinates used to render the model.
     problem: LinearInverseProblem
         Measurement operator, observations, noise, and image shape.
     truth: np.ndarray
@@ -87,17 +80,8 @@ def evaluate_model(
     Raises:
     -------
     ValueError
-        If the runtime model or image shape is incompatible or no members
-        exist.
+        If the image shape is incompatible or no members exist.
     """
-    model_class = type(model)
-    qualified_model_class = (
-        f"{model_class.__module__}.{model_class.__qualname__}"
-    )
-    if trained_model.model_class != qualified_model_class:
-        raise ValueError(
-            "The runtime model class differs from the trained model."
-        )
     if trained_model.image_shape != problem.image_shape:
         raise ValueError(
             "The inverse-problem image shape differs from the trained model."
@@ -110,6 +94,8 @@ def evaluate_model(
         jax.default_backend(),
         jax.devices(),
     )
+    model = trained_model.model
+    coordinates = trained_model.coordinates
     parameters = trained_model.parameters
     member_images = np.stack(
         [

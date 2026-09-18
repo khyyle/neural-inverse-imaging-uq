@@ -273,46 +273,14 @@ class NeuralImage(nn.Module):
         return predict_image(coordinates)
 
 
-def build_vlbi_coordinate_grid(
-    image_shape: tuple[int, int],
-    *,
-    flatten: bool = True,
-) -> jax.Array:
-    """
-    Build an inclusive row-column grid used by VLBI models.
-
-    Parameters:
-    -----------
-    image_shape: tuple[int, int]
-        `(height, width)` of the image grid.
-    flatten: bool
-        If `True`, combine the image axes in row-major order. If `False`,
-        retain two image dimensions.
-
-    Returns:
-    --------
-    jax.Array
-        Shape `(height * width, 2)` when flattened, otherwise
-        `(height, width, 2)`. Both coordinate axes include zero and one
-    
-    Notes:
-    ------
-    This uses `meshgrid(..., indexing="ij") so both normalized axes include zero and one.
-    For a dimension of size `n`, spacing is `1 / (n - 1)`.
-    """
-    if len(image_shape) != 2 or any(dimension <= 0 for dimension in image_shape):
-        raise ValueError("`image_shape` must contain two positive dimensions.")
-
-    height, width = image_shape
-    row_axis = np.linspace(0.0, 1.0, height)
-    column_axis = np.linspace(0.0, 1.0, width)
-
-    rows, columns = np.meshgrid(row_axis, column_axis, indexing="ij")
-
-    coordinates = np.stack([rows, columns], axis=-1)
-    if flatten:
-        coordinates = coordinates.reshape(-1, 2)
-    return jnp.asarray(coordinates)
+def build_neural_image(config: NeuralImageConfig) -> NeuralImage:
+    """Construct a neural image from its saved recipe."""
+    return NeuralImage(
+        positional_encoding_degree=config.positional_encoding_degree,
+        network_depth=config.network_depth,
+        network_width=config.network_width,
+        output_logit_offset=config.output_logit_offset,
+    )
 
 
 def last_layer_inputs_and_logits(

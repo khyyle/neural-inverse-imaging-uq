@@ -4,22 +4,21 @@ import argparse
 import logging
 from pathlib import Path
 
-import ehtim as eh
 import jax
 
 from bhuq.forward import (
     EHT_2017_HIGH_BAND,
-    LinearInverseProblem,
     VlbiProblemConfig,
-    build_vlbi_inverse_problem,
-    simulate_observation,
+    build_vlbi_problem_from_config,
 )
 from bhuq.image_loading import derive_image_name
 from bhuq.model_training import train_model
 from bhuq.models import (
+    CoordinateConvention,
     NeuralImage,
     NeuralImageConfig,
-    build_vlbi_coordinate_grid,
+    build_coordinate_grid,
+    build_neural_image,
 )
 from bhuq.training import TrainingConfig
 
@@ -42,6 +41,7 @@ MODEL_CONFIG = NeuralImageConfig(
 TRAINING_CONFIG = TrainingConfig()
 SEEDS = tuple(range(5))
 MODEL_LABEL = "neural_image"
+COORDINATE_CONVENTION: CoordinateConvention = "row_column_inclusive"
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -70,6 +70,13 @@ def parse_arguments() -> argparse.Namespace:
         default=Path("model_cache"),
         help="Parent directory for saved model bundles.",
     )
+    parser.add_argument(
+        "--seeds",
+        type=int,
+        nargs="+",
+        default=SEEDS,
+        help="Independent ensemble seeds; defaults to five members.",
+    )
     return parser.parse_args()
 
 
@@ -92,45 +99,16 @@ def build_problem_config(
     )
 
 
-def build_problem(config: VlbiProblemConfig) -> LinearInverseProblem:
-    """Load the ehtim source and array, then construct the VLBI problem."""
-    source = eh.image.load_txt(str(config.source_image_path))
-    telescope_array = eh.array.load_txt(
-        str(config.telescope_array_path)
-    )
-    observation = simulate_observation(
-        source,
-        telescope_array,
-        bandwidth_hz=config.bandwidth_hz,
-        integration_time_seconds=config.integration_time_seconds,
-        scan_advance_seconds=config.scan_advance_seconds,
-        start_time_hours=config.start_time_hours,
-        stop_time_hours=config.stop_time_hours,
-        transform_type=config.transform_type,
-        add_thermal_noise=config.add_thermal_noise,
-        thermal_noise_seed=config.thermal_noise_seed,
-    )
-    return build_vlbi_inverse_problem(
-        observation,
-        pixel_count=config.pixel_count,
-        field_of_view_radians=source.fovx(),
-    )
-
-
 def build_model(
     config: NeuralImageConfig,
     image_shape: tuple[int, int],
 ) -> tuple[NeuralImage, jax.Array]:
     """Construct a neural image and its coordinate grid."""
-    coordinates = build_vlbi_coordinate_grid(image_shape)
-    model = NeuralImage(
-        positional_encoding_degree=(
-            config.positional_encoding_degree
-        ),
-        network_depth=config.network_depth,
-        network_width=config.network_width,
-        output_logit_offset=config.output_logit_offset,
+    coordinates = build_coordinate_grid(
+        image_shape,
+        COORDINATE_CONVENTION,
     )
+    model = build_neural_image(config)
     return model, coordinates
 
 
@@ -149,7 +127,7 @@ def main() -> None:
     """Train and cache one configured VLBI ensemble."""
     arguments = parse_arguments()
     problem_config = build_problem_config(arguments)
-    problem = build_problem(problem_config)
+    problem, _truth = build_vlbi_problem_from_config(problem_config)
     model, coordinates = build_model(MODEL_CONFIG, problem.image_shape)
     model_name = build_model_name(problem_config)
     logging.basicConfig(level=logging.INFO)
@@ -158,14 +136,11 @@ def main() -> None:
         coordinates,
         problem,
         TRAINING_CONFIG,
-        SEEDS,
+        tuple(arguments.seeds),
+        coordinate_convention=COORDINATE_CONVENTION,
         model_name=model_name,
         model_metadata=MODEL_CONFIG,
         problem_metadata=problem_config,
-        input_paths={
-            "source_image": problem_config.source_image_path,
-            "telescope_array": problem_config.telescope_array_path,
-        },
         cache_root=arguments.cache_root,
     )
     if trained_model.saved_model is None:

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from typing import Any, Literal
 
 import jax
@@ -41,8 +41,6 @@ class TrainingConfig:
     batch_size: int | None
         Measurements sampled without replacement per update. `None` uses all
         measurements.
-    seed: int
-        Seed for parameter initialization and measurement batching.
     log_interval: int
         Number of steps between recorded training losses.
     show_progress: bool
@@ -54,7 +52,6 @@ class TrainingConfig:
     final_learning_rate: float = 1e-4
     learning_rate_schedule: LearningRateSchedule = "linear"
     batch_size: int | None = 501
-    seed: int = 0
     log_interval: int = 100
     show_progress: bool = True
 
@@ -129,6 +126,8 @@ def fit_linear_inverse_problem(
     coordinates: jax.Array,
     problem: LinearInverseProblem,
     config: TrainingConfig,
+    *,
+    seed: int,
 ) -> TrainingResult:
     """
     Fit a Flax image model to linear measurements.
@@ -146,6 +145,8 @@ def fit_linear_inverse_problem(
         Fixed measurement operator, observations, and noise.
     config: TrainingConfig
         Optimization settings.
+    seed: int
+        Parameter-initialization and measurement-batching seed.
     Returns:
     --------
     TrainingResult
@@ -159,7 +160,7 @@ def fit_linear_inverse_problem(
             f"{number_of_measurements} measurements."
         )
 
-    initialization_key = jax.random.PRNGKey(config.seed)
+    initialization_key = jax.random.PRNGKey(seed)
     batch_key = jax.random.fold_in(initialization_key, 1)
     parameters = model.init(initialization_key, coordinates)["params"]
 
@@ -209,7 +210,7 @@ def fit_linear_inverse_problem(
 
     for step in tqdm(
         range(config.number_of_steps),
-        desc=f"training seed {config.seed}",
+        desc=f"training seed {seed}",
         disable=not config.show_progress,
     ):
         state, loss, batch_key = optimization_step(
@@ -276,7 +277,8 @@ def fit_ensemble(
                 model,
                 coordinates,
                 problem,
-                replace(config, seed=seed),
+                config,
+                seed=seed,
             )
         )
     return results

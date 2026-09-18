@@ -8,6 +8,7 @@ from .radon import (
     RadonProblemConfig,
     build_radon_inverse_problem,
     build_radon_matrix,
+    build_radon_problem_from_config,
     radon_transform,
 )
 from .vlbi import (
@@ -16,6 +17,7 @@ from .vlbi import (
     VlbiBand,
     VlbiProblemConfig,
     build_vlbi_inverse_problem,
+    build_vlbi_problem_from_config,
     simulate_observation,
 )
 
@@ -32,7 +34,9 @@ __all__ = [
     "VlbiProblemConfig",
     "build_radon_inverse_problem",
     "build_radon_matrix",
+    "build_radon_problem_from_config",
     "build_vlbi_inverse_problem",
+    "build_vlbi_problem_from_config",
     "radon_transform",
     "simulate_observation",
 ]

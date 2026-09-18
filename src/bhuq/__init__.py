@@ -3,7 +3,12 @@
 from .evaluation import UncertaintyEvaluationConfig
 from .model_cache import SavedModel, open_saved_model
 from .model_evaluation import ModelEvaluationResult, evaluate_model
-from .model_training import TrainedModel, load_model, train_model
+from .model_training import (
+    TrainedModel,
+    load_model,
+    save_trained_model,
+    train_model,
+)
 from .runs import ExperimentRun
 from .training import TrainingConfig
 
@@ -17,5 +22,6 @@ __all__ = [
     "evaluate_model",
     "load_model",
     "open_saved_model",
+    "save_trained_model",
     "train_model",
 ]

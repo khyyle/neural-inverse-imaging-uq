@@ -120,52 +120,6 @@ def sample_gaussian_frequencies(
     )
 
 
-def build_fourier_feature_coordinate_grid(
-    image_shape: tuple[int, int],
-    *,
-    flatten: bool = True,
-) -> jax.Array:
-    """
-    Build the exclusive horizontal-vertical grid used by ct models.
-
-    Parameters:
-    -----------
-    image_shape: tuple[int, int]
-        `(height, width)` of the image grid.
-    flatten: bool
-        If `True`, combine the image axes in row-major order. If `False`,
-        retain the two image dimensions.
-
-    Returns:
-    --------
-    jax.Array
-        Shape `(height * width, 2)` when flattened, otherwise
-        `(height, width, 2)`. Both axes exclude one.
-
-    Notes:
-    ------
-    This uses `meshgrid(..., indexing="xy")` so both normalized axes include zero and
-    exclude one. For a dimension of size `n`, spacing is `1 / n` with final
-    coordinate `(n - 1) / n`. This is equivalent to `linspace(0, 1, n, endpoint=False)`. 
-    Follows convention used in the Tancik CT experiment.
-    """
-    if len(image_shape) != 2 or any(dimension <= 0 for dimension in image_shape):
-        raise ValueError("`image_shape` must contain two positive dimensions.")
-
-    height, width = image_shape
-    horizontal_axis = np.arange(width) / width
-    vertical_axis = np.arange(height) / height
-    horizontal, vertical = np.meshgrid(
-        horizontal_axis,
-        vertical_axis,
-        indexing="xy",
-    )
-    coordinates = np.stack([horizontal, vertical], axis=-1)
-    if flatten:
-        coordinates = coordinates.reshape(-1, 2)
-    return jnp.asarray(coordinates)
-
-
 class FourierFeatureMLP(nn.Module):
     """
     Render scalar values from Fourier-encoded coordinates.
@@ -235,6 +189,22 @@ class FourierFeatureMLP(nn.Module):
         if return_last_layer_inputs:
             return output, last_layer_inputs, logits
         return output
+
+
+def build_fourier_feature_model(
+    config: FourierFeatureModelConfig,
+) -> FourierFeatureMLP:
+    """Construct a Fourier-feature MLP from its saved recipe."""
+    frequencies = sample_gaussian_frequencies(
+        jax.random.PRNGKey(config.frequency_seed),
+        number_of_frequencies=config.number_of_frequencies,
+        scale=config.frequency_scale,
+    )
+    return FourierFeatureMLP(
+        frequency_matrix=frequencies,
+        network_depth=config.network_depth,
+        network_width=config.network_width,
+    )
 
 
 def last_layer_image_jacobian(

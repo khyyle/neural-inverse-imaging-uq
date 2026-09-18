@@ -6,11 +6,16 @@ import json
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
+import jax
 import numpy as np
 from flax.serialization import from_bytes, to_bytes
 
+from .models import (
+    CoordinateConvention,
+    build_coordinate_grid,
+)
 from .runs import (
     collect_runtime_metadata,
     describe_file,
@@ -82,6 +87,29 @@ class SavedModel:
         return int(image_shape[0]), int(image_shape[1])
 
     @property
+    def coordinate_convention(self) -> CoordinateConvention:
+        """Coordinate convention used to train the model."""
+        convention = str(
+            self.training_metadata["coordinate_convention"]
+        )
+        if convention not in (
+            "xy_exclusive",
+            "row_column_inclusive",
+        ):
+            raise ValueError(
+                f"Saved model has invalid coordinate convention: "
+                f"{convention}."
+            )
+        return cast(CoordinateConvention, convention)
+
+    def build_coordinates(self) -> jax.Array:
+        """Reconstruct the model's training coordinate grid."""
+        return build_coordinate_grid(
+            self.image_shape,
+            self.coordinate_convention,
+        )
+
+    @property
     def checkpoint_paths(self) -> tuple[Path, ...]:
         return tuple(
             self.directory / member["checkpoint"]
@@ -102,6 +130,17 @@ class SavedModel:
     @property
     def provenance_path(self) -> Path:
         return self.directory / "provenance.json"
+
+    @property
+    def input_paths(self) -> dict[str, Path]:
+        """Input paths recorded when the model was trained."""
+        inputs = self.provenance.get("inputs")
+        if not isinstance(inputs, dict):
+            raise ValueError("Saved-model provenance has invalid inputs.")
+        return {
+            name: Path(description["path"])
+            for name, description in inputs.items()
+        }
 
     @property
     def training_history(self) -> tuple[dict[str, Any], ...]:

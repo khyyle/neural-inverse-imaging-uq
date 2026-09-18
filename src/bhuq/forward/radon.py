@@ -11,7 +11,9 @@ import jax.numpy as jnp
 import numpy as np
 from jax.scipy import ndimage as jax_ndimage
 from jax.typing import ArrayLike
+from skimage.transform import resize_local_mean
 
+from ..image_loading import load_scalar_image
 from .linear_problem import LinearInverseProblem
 
 type InterpolationOrder = Literal[0, 1]
@@ -46,6 +48,11 @@ class RadonProblemConfig:
     number_of_projection_angles: int
     interpolation_order: InterpolationOrder
     noise_standard_deviation: float
+
+    @property
+    def input_paths(self) -> dict[str, Path]:
+        """Source files hashed into model provenance."""
+        return {"source_image": self.source_image_path}
 
     @classmethod
     def from_dict(cls, values: dict[str, Any]) -> RadonProblemConfig:
@@ -440,3 +447,51 @@ def build_radon_inverse_problem(
             f"and interpolation order {interpolation_order}"
         ),
     )
+
+
+def build_radon_problem_from_config(
+    config: RadonProblemConfig,
+) -> tuple[LinearInverseProblem, np.ndarray]:
+    """
+    Rebuild a CT problem and normalized truth from its saved recipe.
+
+    Parameters:
+    -----------
+    config: RadonProblemConfig
+        Source, resolution, projection, interpolation, and noise settings.
+
+    Returns:
+    --------
+    problem: LinearInverseProblem
+        Synthetic CT measurements and implicit Radon operator.
+    truth: np.ndarray
+        Resized source image normalized by its maximum intensity.
+    """
+    source_image = load_scalar_image(
+        config.source_image_path,
+        array_key=config.source_array_key,
+    )
+    resized_image = resize_local_mean(
+        source_image,
+        (config.pixel_count, config.pixel_count),
+        grid_mode=True,
+        preserve_range=True,
+    )
+    maximum_intensity = float(resized_image.max())
+    if maximum_intensity <= 0.0:
+        raise ValueError("The resized source image must have positive intensity.")
+    truth = resized_image / maximum_intensity
+    projection_angles = np.linspace(
+        0.0,
+        np.pi,
+        config.number_of_projection_angles,
+        endpoint=False,
+        dtype=np.float32,
+    )
+    problem = build_radon_inverse_problem(
+        truth,
+        projection_angles,
+        noise_standard_deviation=config.noise_standard_deviation,
+        interpolation_order=config.interpolation_order,
+    )
+    return problem, truth

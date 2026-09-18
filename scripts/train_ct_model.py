@@ -5,21 +5,19 @@ import logging
 from pathlib import Path
 
 import jax
-import numpy as np
-from skimage.transform import resize_local_mean
 
 from bhuq.forward import (
-    LinearInverseProblem,
     RadonProblemConfig,
-    build_radon_inverse_problem,
+    build_radon_problem_from_config,
 )
-from bhuq.image_loading import derive_image_name, load_scalar_image
+from bhuq.image_loading import derive_image_name
 from bhuq.model_training import train_model
 from bhuq.models import (
+    CoordinateConvention,
     FourierFeatureMLP,
     FourierFeatureModelConfig,
-    build_fourier_feature_coordinate_grid,
-    sample_gaussian_frequencies,
+    build_coordinate_grid,
+    build_fourier_feature_model,
 )
 from bhuq.training import TrainingConfig
 
@@ -46,6 +44,7 @@ TRAINING_CONFIG = TrainingConfig(
 )
 SEEDS = tuple(range(5))
 MODEL_LABEL = "fourier_feature_mlp"
+COORDINATE_CONVENTION: CoordinateConvention = "xy_exclusive"
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -91,6 +90,13 @@ def parse_arguments() -> argparse.Namespace:
         default=Path("model_cache"),
         help="Parent directory for saved model bundles.",
     )
+    parser.add_argument(
+        "--seeds",
+        type=int,
+        nargs="+",
+        default=SEEDS,
+        help="Independent ensemble seeds; defaults to five members.",
+    )
     return parser.parse_args()
 
 
@@ -108,57 +114,16 @@ def build_problem_config(
     )
 
 
-def build_problem(
-    config: RadonProblemConfig,
-) -> tuple[LinearInverseProblem, np.ndarray]:
-    """Load and prepare the source image, then construct the CT problem."""
-    source_image = load_scalar_image(
-        config.source_image_path,
-        array_key=config.source_array_key,
-    )
-    resized_image = resize_local_mean(
-        source_image,
-        (config.pixel_count, config.pixel_count),
-        grid_mode=True,
-        preserve_range=True,
-    )
-    maximum_intensity = float(resized_image.max())
-    if maximum_intensity <= 0.0:
-        raise ValueError("The resized source image must have positive intensity.")
-    truth = resized_image / maximum_intensity
-
-    projection_angles = np.linspace(
-        0.0,
-        np.pi,
-        config.number_of_projection_angles,
-        endpoint=False,
-        dtype=np.float32,
-    )
-    problem = build_radon_inverse_problem(
-        truth,
-        projection_angles,
-        noise_standard_deviation=config.noise_standard_deviation,
-        interpolation_order=config.interpolation_order,
-    )
-    return problem, truth
-
-
 def build_model(
     config: FourierFeatureModelConfig,
     image_shape: tuple[int, int],
 ) -> tuple[FourierFeatureMLP, jax.Array]:
     """Construct the configured CT model and its coordinate grid."""
-    coordinates = build_fourier_feature_coordinate_grid(image_shape)
-    frequencies = sample_gaussian_frequencies(
-        jax.random.PRNGKey(config.frequency_seed),
-        number_of_frequencies=config.number_of_frequencies,
-        scale=config.frequency_scale,
+    coordinates = build_coordinate_grid(
+        image_shape,
+        COORDINATE_CONVENTION,
     )
-    model = FourierFeatureMLP(
-        frequency_matrix=frequencies,
-        network_depth=config.network_depth,
-        network_width=config.network_width,
-    )
+    model = build_fourier_feature_model(config)
     return model, coordinates
 
 
@@ -179,7 +144,7 @@ def main() -> None:
     """Train and cache one configured CT ensemble."""
     arguments = parse_arguments()
     problem_config = build_problem_config(arguments)
-    problem, _truth = build_problem(problem_config)
+    problem, _truth = build_radon_problem_from_config(problem_config)
     model, coordinates = build_model(MODEL_CONFIG, problem.image_shape)
     model_name = build_model_name(problem_config)
     logging.basicConfig(level=logging.INFO)
@@ -188,11 +153,11 @@ def main() -> None:
         coordinates,
         problem,
         TRAINING_CONFIG,
-        SEEDS,
+        tuple(arguments.seeds),
+        coordinate_convention=COORDINATE_CONVENTION,
         model_name=model_name,
         model_metadata=MODEL_CONFIG,
         problem_metadata=problem_config,
-        input_paths={"source_image": problem_config.source_image_path},
         cache_root=arguments.cache_root,
     )
     if trained_model.saved_model is None:

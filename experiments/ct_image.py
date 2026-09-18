@@ -5,26 +5,18 @@ import logging
 from dataclasses import dataclass
 from pathlib import Path
 
-import jax
 import matplotlib.pyplot as plt
-import numpy as np
-from skimage.transform import resize_local_mean
 
 from bhuq.evaluation import UncertaintyEvaluationConfig
-from bhuq.forward import RadonProblemConfig, build_radon_inverse_problem
-from bhuq.image_loading import derive_image_name, load_scalar_image
+from bhuq.forward import RadonProblemConfig, build_radon_problem_from_config
+from bhuq.image_loading import derive_image_name
 from bhuq.model_cache import open_saved_model
 from bhuq.model_evaluation import (
     ModelEvaluationResult,
     evaluate_model,
 )
 from bhuq.model_training import load_model
-from bhuq.models import (
-    FourierFeatureMLP,
-    FourierFeatureModelConfig,
-    build_fourier_feature_coordinate_grid,
-    sample_gaussian_frequencies,
-)
+from bhuq.models import FourierFeatureModelConfig, build_fourier_feature_model
 from bhuq.runs import ExperimentRun
 from bhuq.visualization import (
     make_fourier_figure,
@@ -69,55 +61,12 @@ def evaluate(config: ExperimentConfig) -> ModelEvaluationResult:
         saved_model.model_metadata
     )
 
-    source_image_path = problem_config.source_image_path
-    source_image = load_scalar_image(
-        source_image_path,
-        array_key=problem_config.source_array_key,
-    )
-    pixel_count = problem_config.pixel_count
-    resized_image = resize_local_mean(
-        source_image,
-        (pixel_count, pixel_count),
-        grid_mode=True,
-        preserve_range=True,
-    )
-    truth = resized_image / float(resized_image.max())
-    angles = np.linspace(
-        0.0,
-        np.pi,
-        problem_config.number_of_projection_angles,
-        endpoint=False,
-        dtype=np.float32,
-    )
-    problem = build_radon_inverse_problem(
-        truth,
-        angles,
-        noise_standard_deviation=problem_config.noise_standard_deviation,
-        interpolation_order=problem_config.interpolation_order,
-    )
-    coordinates = build_fourier_feature_coordinate_grid(problem.image_shape)
-    frequencies = sample_gaussian_frequencies(
-        jax.random.PRNGKey(model_config.frequency_seed),
-        number_of_frequencies=model_config.number_of_frequencies,
-        scale=model_config.frequency_scale,
-    )
-    model = FourierFeatureMLP(
-        frequency_matrix=frequencies,
-        network_depth=model_config.network_depth,
-        network_width=model_config.network_width,
-    )
+    problem, truth = build_radon_problem_from_config(problem_config)
+    model = build_fourier_feature_model(model_config)
 
-    input_paths = {"source_image": source_image_path}
-    trained_model = load_model(
-        saved_model,
-        model,
-        coordinates,
-        input_paths=input_paths,
-    )
+    trained_model = load_model(saved_model, model)
     return evaluate_model(
         trained_model,
-        model,
-        coordinates,
         problem,
         truth,
         config.uncertainty,

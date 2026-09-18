@@ -83,6 +83,14 @@ class VlbiProblemConfig:
     add_thermal_noise: bool
     thermal_noise_seed: int
 
+    @property
+    def input_paths(self) -> dict[str, Path]:
+        """Source files hashed into model provenance."""
+        return {
+            "source_image": self.source_image_path,
+            "telescope_array": self.telescope_array_path,
+        }
+
     @classmethod
     def from_dict(cls, values: dict[str, Any]) -> VlbiProblemConfig:
         """Restore typed problem configuration from saved JSON metadata."""
@@ -243,3 +251,51 @@ def build_vlbi_inverse_problem(
             f"VLBI visibility operator with {np.asarray(visibilities).size} measurements"
         ),
     )
+
+
+def build_vlbi_problem_from_config(
+    config: VlbiProblemConfig,
+) -> tuple[LinearInverseProblem, np.ndarray]:
+    """
+    Rebuild a VLBI problem and truth image from its saved recipe.
+
+    Parameters:
+    -----------
+    config: VlbiProblemConfig
+        Source, array, resolution, observation, transform, and noise settings.
+
+    Returns:
+    --------
+    problem: LinearInverseProblem
+        Visibility measurements, noise, and dense Fourier operator.
+    truth: np.ndarray
+        Source image regridded to the reconstruction resolution.
+    """
+    import ehtim as eh
+
+    source = eh.image.load_txt(str(config.source_image_path))
+    telescope_array = eh.array.load_txt(str(config.telescope_array_path))
+    observation = simulate_observation(
+        source,
+        telescope_array,
+        bandwidth_hz=config.bandwidth_hz,
+        integration_time_seconds=config.integration_time_seconds,
+        scan_advance_seconds=config.scan_advance_seconds,
+        start_time_hours=config.start_time_hours,
+        stop_time_hours=config.stop_time_hours,
+        transform_type=config.transform_type,
+        add_thermal_noise=config.add_thermal_noise,
+        thermal_noise_seed=config.thermal_noise_seed,
+    )
+    problem = build_vlbi_inverse_problem(
+        observation,
+        pixel_count=config.pixel_count,
+        field_of_view_radians=source.fovx(),
+    )
+    truth = np.asarray(
+        source.regrid_image(
+            source.fovx(),
+            config.pixel_count,
+        ).imarr()
+    )
+    return problem, truth

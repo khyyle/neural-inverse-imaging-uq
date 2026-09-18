@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -19,6 +19,7 @@ from .model_cache import (
     _save_model,
     validate_model_inputs,
 )
+from .models import CoordinateConvention
 from .training import (
     ParameterTree,
     TrainingConfig,
@@ -60,10 +61,14 @@ class TrainedModel:
 
     Parameters:
     -----------
+    model: nn.Module
+        Flax module used to render every member.
+    coordinates: jax.Array
+        Default image-coordinate grid used during training.
+    coordinate_convention: CoordinateConvention
+        Ordering and endpoint convention represented by `coordinates`.
     members: tuple[TrainedModelMember, ...]
         Fitted members in seed order.
-    model_class: str
-        Fully qualified Flax model class.
     image_shape: tuple[int, int]
         Image dimensions represented by every member.
     training_started_at: datetime
@@ -74,12 +79,19 @@ class TrainedModel:
         Persistent cache identity, or `None` when saving was disabled.
     """
 
+    model: nn.Module
+    coordinates: jax.Array
+    coordinate_convention: CoordinateConvention
     members: tuple[TrainedModelMember, ...]
-    model_class: str
     image_shape: tuple[int, int]
     training_started_at: datetime
     training_elapsed_seconds: float
     saved_model: SavedModel | None
+
+    @property
+    def model_class(self) -> str:
+        """Fully qualified class name of the runtime model."""
+        return _qualified_model_class(self.model)
 
     @property
     def parameters(self) -> tuple[ParameterTree, ...]:
@@ -96,7 +108,7 @@ class TrainedModel:
 class _ModelTrainingMetadata:
     model_class: str
     image_shape: tuple[int, int]
-    coordinate_shape: tuple[int, ...]
+    coordinate_convention: CoordinateConvention
     model: Any
     problem: Any
     optimization: TrainingConfig
@@ -109,6 +121,7 @@ def train_model(
     config: TrainingConfig,
     seeds: tuple[int, ...],
     *,
+    coordinate_convention: CoordinateConvention,
     save: bool = True,
     model_name: str | None = None,
     model_metadata: Any = None,
@@ -134,6 +147,8 @@ def train_model(
         Optimizer and training-loop settings.
     seeds: tuple[int, ...]
         Independent ensemble seeds.
+    coordinate_convention: CoordinateConvention
+        Ordering and endpoint convention represented by `coordinates`.
     save: bool
         Whether to save parameters, histories, timing, and provenance.
     model_name: str | None
@@ -160,6 +175,8 @@ def train_model(
     resolved_seeds = tuple(seeds)
     if not resolved_seeds:
         raise ValueError("`seeds` must contain at least one value.")
+    if len(set(resolved_seeds)) != len(resolved_seeds):
+        raise ValueError("`seeds` must not contain duplicates.")
     if save and model_name is None:
         raise ValueError("`model_name` is required when `save=True`.")
 
@@ -168,7 +185,6 @@ def train_model(
         jax.default_backend(),
         jax.devices(),
     )
-    model_class = _qualified_model_class(model)
     training_started_at = datetime.now(UTC)
     start_time = time.monotonic()
     training_results = fit_ensemble(
@@ -194,50 +210,117 @@ def train_model(
         )
     )
 
-    saved_model = None
-    if save:
-        metadata = _ModelTrainingMetadata(
-            model_class=model_class,
-            image_shape=problem.image_shape,
-            coordinate_shape=tuple(coordinates.shape),
-            model=model_metadata,
-            problem=problem_metadata,
-            optimization=config,
-        )
-        saved_model = _save_model(
-            model_name=model_name,
-            parameters=tuple(member.parameters for member in members),
-            seeds=resolved_seeds,
-            final_losses=tuple(member.final_loss for member in members),
-            recorded_steps=tuple(
-                member.recorded_steps for member in members
-            ),
-            loss_histories=tuple(
-                member.loss_history for member in members
-            ),
-            training_metadata=metadata,
-            input_paths=input_paths or {},
-            training_started_at=training_started_at,
-            training_elapsed_seconds=elapsed_seconds,
-            cache_root=cache_root,
-        )
-
-    return TrainedModel(
+    trained_model = TrainedModel(
+        model=model,
+        coordinates=coordinates,
+        coordinate_convention=coordinate_convention,
         members=members,
-        model_class=model_class,
         image_shape=problem.image_shape,
         training_started_at=training_started_at,
         training_elapsed_seconds=elapsed_seconds,
-        saved_model=saved_model,
+        saved_model=None,
     )
+    if not save:
+        return trained_model
+    return save_trained_model(
+        trained_model,
+        model_name=model_name,
+        training_config=config,
+        model_metadata=model_metadata,
+        problem_metadata=problem_metadata,
+        input_paths=input_paths,
+        cache_root=cache_root,
+    )
+
+
+def save_trained_model(
+    trained_model: TrainedModel,
+    *,
+    model_name: str,
+    training_config: TrainingConfig,
+    model_metadata: Any,
+    problem_metadata: Any,
+    input_paths: dict[str, str | Path] | None = None,
+    cache_root: str | Path = Path("model_cache"),
+) -> TrainedModel:
+    """
+    Save an already-trained ensemble in the standard model-cache format.
+
+    Parameters:
+    -----------
+    trained_model: TrainedModel
+        In-memory members and training diagnostics without a saved identity.
+    model_name: str
+        Semantic cache path.
+    training_config: TrainingConfig
+        Optimization settings shared by the members.
+    model_metadata: Any
+        Architecture configuration stored with the model.
+    problem_metadata: Any
+        Forward-problem configuration stored with the model.
+    input_paths: dict[str, str | Path] | None
+        Optional source-file override. By default, paths come from
+        `problem_metadata.input_paths`.
+    cache_root: str | Path
+        Parent directory for saved model bundles.
+
+    Returns:
+    --------
+    TrainedModel
+        The same ensemble with its immutable saved-model identity attached.
+
+    Raises:
+    -------
+    ValueError
+        If the ensemble is empty, already saved, or contains duplicate seeds.
+    """
+    if trained_model.saved_model is not None:
+        raise ValueError("`trained_model` is already saved.")
+    if not trained_model.members:
+        raise ValueError("`trained_model` must contain at least one member.")
+    seeds = trained_model.seeds
+    if len(set(seeds)) != len(seeds):
+        raise ValueError("Trained member seeds must be unique.")
+
+    metadata = _ModelTrainingMetadata(
+        model_class=trained_model.model_class,
+        image_shape=trained_model.image_shape,
+        coordinate_convention=trained_model.coordinate_convention,
+        model=model_metadata,
+        problem=problem_metadata,
+        optimization=training_config,
+    )
+    saved_model = _save_model(
+        model_name=model_name,
+        parameters=trained_model.parameters,
+        seeds=seeds,
+        final_losses=tuple(
+            member.final_loss for member in trained_model.members
+        ),
+        recorded_steps=tuple(
+            member.recorded_steps for member in trained_model.members
+        ),
+        loss_histories=tuple(
+            member.loss_history for member in trained_model.members
+        ),
+        training_metadata=metadata,
+        input_paths=(
+            _metadata_input_paths(problem_metadata)
+            if input_paths is None
+            else input_paths
+        ),
+        training_started_at=trained_model.training_started_at,
+        training_elapsed_seconds=trained_model.training_elapsed_seconds,
+        cache_root=cache_root,
+    )
+    return replace(trained_model, saved_model=saved_model)
 
 
 def load_model(
     saved_model: SavedModel,
     model: nn.Module,
-    coordinates: jax.Array,
     *,
-    input_paths: dict[str, str | Path],
+    input_paths: dict[str, str | Path] | None = None,
 ) -> TrainedModel:
     """
     Load a saved model into the same representation returned by training.
@@ -248,10 +331,8 @@ def load_model(
         A model-cache record.
     model: nn.Module
         Constructed model matching the saved model class.
-    coordinates: jax.Array
-        Coordinates matching the saved training coordinate shape.
-    input_paths: dict[str, str | Path]
-        Current input files verified against training provenance.
+    input_paths: dict[str, str | Path] | None
+        Optional relocated inputs. Recorded paths are used by default.
 
     Returns:
     --------
@@ -261,22 +342,18 @@ def load_model(
     Raises:
     -------
     ValueError
-        If the model class, coordinate shape, input files, or histories differ
+        If the model class, input files, or histories differ
         from the saved record.
     """
     if _qualified_model_class(model) != saved_model.model_class:
         raise ValueError(
             "The runtime model class differs from the saved model."
         )
-    coordinate_shape = tuple(
-        int(size)
-        for size in saved_model.training_metadata["coordinate_shape"]
+    validate_model_inputs(
+        saved_model,
+        saved_model.input_paths if input_paths is None else input_paths,
     )
-    if tuple(coordinates.shape) != coordinate_shape:
-        raise ValueError(
-            "Runtime coordinates differ from the saved training shape."
-        )
-    validate_model_inputs(saved_model, input_paths)
+    coordinates = saved_model.build_coordinates()
 
     template_parameters = model.init(
         jax.random.PRNGKey(0),
@@ -320,8 +397,10 @@ def load_model(
         )
 
     return TrainedModel(
+        model=model,
+        coordinates=coordinates,
+        coordinate_convention=saved_model.coordinate_convention,
         members=tuple(members),
-        model_class=saved_model.model_class,
         image_shape=saved_model.image_shape,
         training_started_at=datetime.fromisoformat(
             saved_model.provenance["training_started_at"]
@@ -331,6 +410,19 @@ def load_model(
         ),
         saved_model=saved_model,
     )
+
+
+def _metadata_input_paths(metadata: Any) -> dict[str, Path]:
+    """Return source paths declared by problem metadata."""
+    input_paths = getattr(metadata, "input_paths", None)
+    if input_paths is None:
+        return {}
+    if not isinstance(input_paths, dict):
+        raise TypeError("`problem_metadata.input_paths` must be a dictionary.")
+    return {
+        str(name): Path(path)
+        for name, path in input_paths.items()
+    }
 
 
 def _qualified_model_class(model: nn.Module) -> str:
