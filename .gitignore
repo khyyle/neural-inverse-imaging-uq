@@ -6,6 +6,7 @@ __pycache__/
 model_cache/
 checkpoints/
 results/
+archive/legacy-results/
 *.egg-info/
 bh_vlbi_unc_results/
 black_hole_unc_results/
